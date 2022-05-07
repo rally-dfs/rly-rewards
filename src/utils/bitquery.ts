@@ -182,7 +182,7 @@ export async function allTransfersBetweenDatesBitquery(
     );
   });
 
-  return filteredTransfersOut.concat(filteredTransfersOut);
+  return filteredTransfersOut.concat(filteredTransfersIn);
 }
 
 export type BitqueryTokenAccountInfo = {
@@ -244,13 +244,13 @@ export async function tokenAccountsInfoBetweenDatesBitquery(
       };
     }
 
-    accountInfoMap[result.sender.mintAccount].balanceChange -= result.amount;
-    accountInfoMap[result.receiver.mintAccount].balanceChange += result.amount;
+    accountInfoMap[result.sender.mintAccount]!.balanceChange -= result.amount;
+    accountInfoMap[result.receiver.mintAccount]!.balanceChange += result.amount;
 
-    accountInfoMap[result.sender.mintAccount].outgoingTransactions.add(
+    accountInfoMap[result.sender.mintAccount]!.outgoingTransactions.add(
       result.transaction.signature
     );
-    accountInfoMap[result.receiver.mintAccount].incomingTransactions.add(
+    accountInfoMap[result.receiver.mintAccount]!.incomingTransactions.add(
       result.transaction.signature
     );
   });

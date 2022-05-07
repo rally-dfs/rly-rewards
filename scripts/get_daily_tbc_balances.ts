@@ -1,6 +1,6 @@
 import { getKnex, closeKnexConnection } from "../src/database";
 import { PublicKey } from "@solana/web3.js";
-import { TBCAccount, TBCAccountBalance } from "../src/types/tbc_accounts";
+import { TBCAccountBalance } from "../src/types/tbc_accounts";
 import { getDailyTokenBalancesBetweenDates } from "../src/utils/combinedQueries";
 
 /** Calls getDailyTokenBalancesBetweenDates for all TBCAccounts. Note that the date is always interpreted as 00:00 UTC
@@ -42,7 +42,7 @@ const main = async () => {
   // (and adding a --force flag to override)
 
   for (let i = 0; i < allAccounts.length; i++) {
-    const account = allAccounts[i];
+    const account = allAccounts[i]!;
     console.log(
       `==== Fetching balances for account ${new PublicKey(
         account.token_a_account_address

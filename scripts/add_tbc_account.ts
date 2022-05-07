@@ -3,7 +3,6 @@ import { PublicKey } from "@solana/web3.js";
 import { TBCAccount } from "../src/types/tbc_accounts";
 import { TokenMint } from "../src/types/token_mints";
 import bs58 from "bs58";
-import { Token } from "typescript";
 
 /** Inserts new row to tbc_accounts
  *
@@ -27,18 +26,18 @@ const main = async () => {
 
   // validate keys and convert to byte array to store in DB
 
-  const initTransactionHash = bs58.decode(initTransactionHashString);
+  const initTransactionHash = bs58.decode(initTransactionHashString!);
   if (initTransactionHash.length != 64) {
     throw new Error(`Invalid transaction hash`);
   }
 
   const tokenAAccountAddress = new PublicKey(
-    tokenAAccountAddressString
+    tokenAAccountAddressString!
   ).toBytes();
   const tokenAAccountOwnerAddress = new PublicKey(
-    tokenAAccountOwnerAddressString
+    tokenAAccountOwnerAddressString!
   ).toBytes();
-  const tokenAMintAddress = new PublicKey(tokenAMintAddressString).toBytes();
+  const tokenAMintAddress = new PublicKey(tokenAMintAddressString!).toBytes();
 
   console.log(
     `Adding tbc account ${initTransactionHashString}: ${tokenAAccountAddressString}, ` +
@@ -54,12 +53,12 @@ const main = async () => {
       init_transaction_hash: initTransactionHash,
       token_a_account_address: tokenAAccountAddress,
       token_a_account_owner_address: tokenAAccountOwnerAddress,
-      token_a_mint_id: tokenAMintRow[0].id,
+      token_a_mint_id: tokenAMintRow[0]!.id,
     },
     "*" // need this for postgres to return the added result
   );
 
-  console.log(`Done adding tbc account PK ${result[0].id}`);
+  console.log(`Done adding tbc account PK ${result[0]!.id}`);
 
   closeKnexConnection();
 };
