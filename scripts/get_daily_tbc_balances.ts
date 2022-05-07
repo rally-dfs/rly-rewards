@@ -1,7 +1,7 @@
 import { getKnex, closeKnexConnection } from "../src/database";
 import { PublicKey } from "@solana/web3.js";
-import { TBCAccountBalance } from "../src/types/tbc_accounts";
-import { getDailyTokenBalancesBetweenDates } from "../src/utils/combinedQueries";
+import { TBCAccountBalance } from "../src/knex-types/tbc_accounts";
+import { getDailyTokenBalancesBetweenDates } from "../src/chain-data-utils/combinedQueries";
 
 /** Calls getDailyTokenBalancesBetweenDates for all TBCAccounts. Note that the date is always interpreted as 00:00 UTC
  * for consistency (i.e. you can't pass a specific time, only dates)

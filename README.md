@@ -6,7 +6,7 @@ Note we use npm (and package-lock.json) instead of yarn since it seems to work b
 
 ## Types
 
-The types in src/types can be used to templatize the knex calls, e.g.
+The types in src/knex-types can be used to templatize the knex calls, e.g.
 
 `const result: TBCAccount[] = await knex<TBCAccount>("tbc_accounts")...`
 
