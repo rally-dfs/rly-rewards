@@ -1,43 +1,22 @@
-import {
-  ApolloClient,
-  HttpLink,
-  InMemoryCache,
-  gql,
-  NormalizedCacheObject,
-} from "@apollo/client";
-import fetch from "cross-fetch";
+import { request, gql } from "graphql-request";
 
-export function createApolloClient(uri: string, headers: object) {
-  return new ApolloClient({
-    ssrMode: typeof window === "undefined",
-    link: new HttpLink({
-      uri: uri,
-      fetch,
-      headers,
-    }),
-    cache: new InMemoryCache(), // TODO: need to put anything here?
-  });
-
-  // TODO: we can do a lot more stuff with caching probably (since it's on the backend though need to make sure
-  // there's no private info leak from different calls), e.g.
-  // https://github.com/vercel/next.js/blob/c947c9320619f1bd9a786bf7f3d1b36b79bde8b0/examples/with-apollo/lib/apolloClient.js#L30
-  // https://medium.com/@zhamdi/server-side-rendering-ssr-using-apollo-and-next-js-ac0b2e3ea461
-}
-
-export async function queryApollo(
-  client: ApolloClient<NormalizedCacheObject>,
-  query: string,
-  variables?: object
+export async function queryGQL(
+  url: string,
+  queryString: string,
+  variables?: object,
+  headers?: HeadersInit
 ) {
   //   console.log("calling query = ", query, variables);
 
   try {
-    const result = await client.query({
-      query: gql(query),
-      variables: variables,
-      // TODO: fix this? bitquery doesn't have IDs on solana so paging doesn't work with cache.
-      // maybe no need to use apollo at all
-      fetchPolicy: "no-cache",
+    const query = gql`
+      ${queryString}
+    `;
+    const result = await request({
+      url,
+      document: query,
+      variables,
+      requestHeaders: headers,
     });
 
     //   console.log("result = ", result);
@@ -45,7 +24,7 @@ export async function queryApollo(
 
     return result;
   } catch (error) {
-    console.log("queryApollo error", query, variables, error);
+    console.log("gql query error", queryString, variables, error);
     return { data: [] };
   }
 }

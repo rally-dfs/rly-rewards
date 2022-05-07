@@ -1,12 +1,17 @@
-import { createApolloClient, queryApollo } from "./apollo";
+import { queryGQL } from "./apollo";
 
-const bitqueryApolloClient = createApolloClient(
-  "https://graphql.bitquery.io/",
-  {
-    "X-API-KEY": process.env.BITQUERY_API_KEY,
-    "Content-Type": "application/json",
-  }
-);
+async function _queryBitqueryGQL(queryString: string, variables?: object) {
+  let headers = [
+    ["X-API-KEY", process.env.BITQUERY_API_KEY!],
+    ["Content-Type", "application/json"],
+  ];
+  return await queryGQL(
+    "https://graphql.bitquery.io/",
+    queryString,
+    variables,
+    headers
+  );
+}
 
 // wait 10 seconds between API calls (this can probably be reduced if we pay for a better plan)
 const TIMEOUT_BETWEEN_CALLS = 10000;
@@ -66,8 +71,7 @@ async function _transferAmountsWithFilter(
     // T00:00:00Z to T00:00:00Z to avoid duplicates/undercounting
     const endDateInclusive = new Date(endDateExclusive.valueOf() - 1);
 
-    const { data } = await queryApollo(
-      bitqueryApolloClient,
+    const data = await _queryBitqueryGQL(
       `query TransfersForSenderAndToken(
             $startTime: ISO8601DateTime!, $endTime: ISO8601DateTime!, 
             $tokenMintAddress: String!,
@@ -271,8 +275,7 @@ export async function getTransactionSuccessForHashesBitquery(
   for (let i = 0; i < transactionHashes.length; i += pageLimit) {
     const transactionSlices = transactionHashes.slice(i, i + pageLimit);
 
-    const { data } = await queryApollo(
-      bitqueryApolloClient,
+    const data = await _queryBitqueryGQL(
       `query TransactionsForHashes($txnHashes: [String!]!) {
       solana {
         transactions(signature: {in: $txnHashes}) {
