@@ -10,15 +10,21 @@
     "prod": "node dist/server.js",
     "prestart": "./node_modules/.bin/knex migrate:latest",
     "knex": "./node_modules/.bin/knex",
-    "add-tbc-account": "ts-node ./scripts/add_tbc_account.ts"
+    "add-token-mint": "ts-node ./scripts/add_token_mint.ts",
+    "add-tbc-account": "ts-node ./scripts/add_tbc_account.ts",
+    "get-daily-tbc-balances": "ts-node ./scripts/get_daily_tbc_balances.ts"
   },
   "engines": {
     "node": "16.14.2"
   },
   "dependencies": {
+    "@apollo/client": "^3.6.2",
     "@solana/web3.js": "^1.41.4",
     "@types/express": "^4.17.13",
     "@types/node": "^17.0.31",
+    "@types/react": "^18.0.9",
+    "bs58": "^5.0.0",
+    "cross-fetch": "^3.1.5",
     "dotenv": "^16.0.0",
     "express": "^4.18.1",
     "knex": "^2.0.0",

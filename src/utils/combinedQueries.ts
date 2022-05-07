@@ -2,6 +2,7 @@ import { clusterApiUrl, Connection } from "@solana/web3.js";
 
 import { latestAccountInputsOnDateSolanaFm } from "./solanaFm";
 import { allTransfersBetweenDatesBitquery } from "./bitquery";
+import exp from "constants";
 
 const SOL_NETWORK = "mainnet-beta";
 const endpoint = clusterApiUrl(SOL_NETWORK);
@@ -13,7 +14,8 @@ export async function tokenAccountBalanceOnDate(
   tokenMintAddress: string,
   endDateExclusive: Date,
   previousBalance: number,
-  previousEndDateExclusive: Date
+  previousEndDateExclusive: Date,
+  tokenMintDecimals: number
 ) {
   // call sfm, then use that date range to call bitquery
   const latestAccountInputSFM = await latestAccountInputsOnDateSolanaFm(
@@ -45,7 +47,10 @@ export async function tokenAccountBalanceOnDate(
   if (transfersBQ[0]) {
     // should probably log this and manually investigate this, bitquery txns are unordered and don't include
     // a timestamp so we have to settle for just picking the first one
-    console.log("Found txn in BQ not found in SFM", transfersBQ);
+    console.log(
+      "Found txn in BQ not found in SFM, should double check this day's data manually",
+      transfersBQ
+    );
   }
 
   const latestTxnHash = transfersBQ[0]
@@ -72,15 +77,17 @@ export async function tokenAccountBalanceOnDate(
       "Couldn't find on chain balance, falling back to solana.fm value",
       latestTxnHash
     );
-    return latestAccountInputSFM?.postBalance;
+    // solana.fm postBalance has no decimals so just multiply by 10^tokenMintDecimals to normalize
+    return latestAccountInputSFM?.postBalance
+      ? latestAccountInputSFM?.postBalance * 10 ** tokenMintDecimals
+      : undefined;
   }
 
   if (balances.length > 1) {
     console.log("Found more than 1 token account for txn", latestTxnHash);
   }
 
-  // TODO: should just use `amount` instead but need to format latestAccountInputSFM?.postBalance above
-  return balances[0].uiTokenAmount.uiAmount;
+  return parseInt(balances[0].uiTokenAmount.amount);
 }
 
 export type TokenBalanceDate = {
@@ -100,7 +107,8 @@ export async function getDailyTokenBalancesBetweenDates(
   tokenAccountOwnerAddress: string,
   tokenMintAddress: string,
   earliestEndDateExclusive: Date,
-  latestEndDateExclusive: Date
+  latestEndDateExclusive: Date,
+  tokenMintDecimals: number
 ) {
   let allBalances: Array<TokenBalanceDate> = [];
 
@@ -127,7 +135,8 @@ export async function getDailyTokenBalancesBetweenDates(
         tokenMintAddress,
         currentEndDateExclusive,
         previousBalance,
-        previousEndDateExclusive
+        previousEndDateExclusive,
+        tokenMintDecimals
       );
 
       console.log(currentEndDateExclusive, "balance = ", balance);
@@ -144,6 +153,7 @@ export async function getDailyTokenBalancesBetweenDates(
       previousEndDateExclusive = new Date(currentEndDateExclusive);
       previousBalance = balance;
     } catch (error) {
+      console.log("Error fetching balance", error);
       allBalances.push({ dateExclusive: currentEndDateExclusive, balance: -1 });
 
       // leave previousDate/previousBalance the same, can try again from there the next loop

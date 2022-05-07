@@ -1,4 +1,5 @@
 import { getTransactionSuccessForHashesBitquery } from "./bitquery";
+import { fetch, Headers } from "cross-fetch";
 
 type SolanaFMAccountInput = {
   transactionHash: string;
