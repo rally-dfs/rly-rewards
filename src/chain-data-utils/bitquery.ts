@@ -1,4 +1,4 @@
-import { queryGQL } from "./apollo";
+import { queryGQL } from "./graphql";
 
 async function _queryBitqueryGQL(queryString: string, variables?: object) {
   let headers = [
