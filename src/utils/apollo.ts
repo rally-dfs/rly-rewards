@@ -5,12 +5,14 @@ import {
   gql,
   NormalizedCacheObject,
 } from "@apollo/client";
+import fetch from "cross-fetch";
 
 export function createApolloClient(uri: string, headers: object) {
   return new ApolloClient({
     ssrMode: typeof window === "undefined",
     link: new HttpLink({
       uri: uri,
+      fetch,
       headers,
     }),
     cache: new InMemoryCache(), // TODO: need to put anything here?
