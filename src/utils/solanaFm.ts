@@ -1,4 +1,3 @@
-import { getTransactionSuccessForHashesBitquery } from "./bitquery";
 import { fetch, Headers } from "cross-fetch";
 
 type SolanaFMAccountInput = {
@@ -11,13 +10,13 @@ type SolanaFMAccountInput = {
 };
 
 // exponential backoff starts at 10 minutes and increases by 10x every iteration
-const START_TIME_DELTA = 60 * 1000;
+const START_TIME_DELTA = 6000 * 1000;
 const EXPONENTIAL_FACTOR = 10;
 
 // wait 10 seconds between API calls
 // sfm is super aggressive with rate limits, seems once you go over they just freeze the account forever (can't figure
 // out how to unfreeze, just had to make a new one). probably not intentional but good to be very conservative here.
-const TIMEOUT_BETWEEN_CALLS = 10000;
+const TIMEOUT_BETWEEN_CALLS = 5000;
 
 // note endDate can be either exclusive or inclusive, depending on which `url` is being called. it's up to the caller
 // to convert endDate into the proper inclusivity before calling this function
@@ -147,14 +146,6 @@ export async function latestAccountInputsOnDateSolanaFm(
 
       // console.log("Max from solana.fm", max);
 
-      // TODO: could probably put in a sanity check alert here, in theory they should all be the same balance
-      let sameTimeAsMax = results.filter((value) => {
-        return (
-          value.timestamp == max.timestamp &&
-          value.postBalance != max.postBalance
-        );
-      });
-
       // console.log("All results with same timestamp as max", sameTimeAsMax);
 
       // TODO: this is in display units, not base units :(, maybe can keep using this as a sanity check though
@@ -254,12 +245,12 @@ export async function tokenAccountsInfoBetweenDatesSolanaFm(
         };
       }
 
-      accountInfoMap[result.account].balance = result.postBalance;
+      accountInfoMap[result.account]!.balance = result.postBalance;
 
       if (result.postBalance == result.preBalance) {
         // this might be a 0 transaction or just one with 0 < amount < 1, the caller should cross reference these with
         // bitquery's results to determine whether it's incoming/outgoing or should be discarded
-        accountInfoMap[result.account].subOneTransactions.add(
+        accountInfoMap[result.account]!.subOneTransactions.add(
           result.transactionHash
         );
       } else if (result.preBalance === 0 && result.postBalance === -1) {
@@ -270,15 +261,15 @@ export async function tokenAccountsInfoBetweenDatesSolanaFm(
         // note that sometimes, sfm does have `non-zero -> -1` transfers (probably due to rounding), so it's not enough
         // to only check postBalance == -1, we must also check preBalance == 0
         // (e.g. 55JVfbghMEGAkTo1tCqYByJfgVm9n4g72XEa131sicxw4c32PZEp1MCZGT1Sx2JBNAoE8MurcG2f2n9wU5sg3tLA)
-        accountInfoMap[result.account].subOneTransactions.add(
+        accountInfoMap[result.account]!.subOneTransactions.add(
           result.transactionHash
         );
       } else if (result.postBalance > result.preBalance) {
-        accountInfoMap[result.account].incomingTransactions.add(
+        accountInfoMap[result.account]!.incomingTransactions.add(
           result.transactionHash
         );
       } else {
-        accountInfoMap[result.account].outgoingTransactions.add(
+        accountInfoMap[result.account]!.outgoingTransactions.add(
           result.transactionHash
         );
       }

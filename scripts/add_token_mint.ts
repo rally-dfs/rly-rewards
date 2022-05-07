@@ -23,13 +23,13 @@ const main = async () => {
 
   const result = await knex<TokenMint>("token_mints").insert(
     {
-      mint_address: new PublicKey(mintAddressString).toBytes(),
-      decimals: parseInt(decimalsString),
+      mint_address: new PublicKey(mintAddressString!).toBytes(),
+      decimals: parseInt(decimalsString!),
     },
     "*" // need this for postgres to return the added result
   );
 
-  console.log(`Done adding token mint PK ${result[0].id}`);
+  console.log(`Done adding token mint PK ${result[0]!.id}`);
 
   closeKnexConnection();
 };

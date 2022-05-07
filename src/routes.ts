@@ -7,7 +7,7 @@ const routes = Router();
 
 const knex = getKnex();
 
-routes.get("/", async (req, res) => {
+routes.get("/", async (_req, res) => {
   const accounts = await knex<TBCAccount>("tbc_accounts").select();
 
   const tbc_account_balances = await knex<TBCAccountBalance>(

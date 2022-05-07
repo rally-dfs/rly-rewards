@@ -2,7 +2,6 @@ import { clusterApiUrl, Connection } from "@solana/web3.js";
 
 import { latestAccountInputsOnDateSolanaFm } from "./solanaFm";
 import { allTransfersBetweenDatesBitquery } from "./bitquery";
-import exp from "constants";
 
 const SOL_NETWORK = "mainnet-beta";
 const endpoint = clusterApiUrl(SOL_NETWORK);
@@ -87,7 +86,7 @@ export async function tokenAccountBalanceOnDate(
     console.log("Found more than 1 token account for txn", latestTxnHash);
   }
 
-  return parseInt(balances[0].uiTokenAmount.amount);
+  return parseInt(balances[0]!.uiTokenAmount.amount);
 }
 
 export type TokenBalanceDate = {
