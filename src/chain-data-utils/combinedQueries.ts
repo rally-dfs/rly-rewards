@@ -1,7 +1,13 @@
 import { clusterApiUrl, Connection } from "@solana/web3.js";
 
-import { latestAccountInputsOnDateSolanaFm } from "./solanaFm";
-import { allTransfersBetweenDatesBitquery } from "./bitquery";
+import {
+  latestAccountInputsOnDateSolanaFm,
+  tokenAccountsInfoBetweenDatesSolanaFm,
+} from "./solanaFm";
+import {
+  allTransfersBetweenDatesBitquery,
+  tokenAccountsInfoBetweenDatesBitquery,
+} from "./bitquery";
 
 const SOL_NETWORK = "mainnet-beta";
 const endpoint = clusterApiUrl(SOL_NETWORK);
@@ -171,4 +177,82 @@ export async function getDailyTokenBalancesBetweenDates(
   console.log("balances", allBalances);
 
   return allBalances;
+}
+
+export type TokenAccountInfo = {
+  tokenAccountAddress: string;
+  ownerAccountAddress?: string;
+  // see note in TokenAccountBalance.approximate_minimum_balance on this
+  approximateMinimumBalance?: number;
+  incomingTransactions: Set<string>;
+  outgoingTransactions: Set<string>;
+};
+
+/** Calls both bitquery and solana.fm versions of getAllTokenAccountInfo for tokenMintAddress from
+ * start date (inclusive) to end date (exclusive). Returns the transactions from bitquery and the balance at
+ * endDate from solana.fm
+ *
+ * @param tokenMintAddress
+ * @param startDateInclusive
+ * @param endDateExclusive
+ */
+export async function getAllTokenAccountInfoAndTransactions(
+  tokenMintAddress: string,
+  tokenMintDecimals: number,
+  startDateInclusive: Date,
+  endDateExclusive: Date
+): Promise<TokenAccountInfo[]> {
+  // solana.fm token accounts info
+  let tokenAccountsInfoSFMMap = await tokenAccountsInfoBetweenDatesSolanaFm(
+    tokenMintAddress,
+    startDateInclusive,
+    endDateExclusive
+  );
+
+  if (tokenAccountsInfoSFMMap === undefined) {
+    console.log("Error retrieving solana.fm token account info");
+  }
+
+  // bitquery token accounts info
+  // note this returns delta(balance) from startDate instead of actual balance (not used for now)
+  let tokenAccountsInfoBQMap = await tokenAccountsInfoBetweenDatesBitquery(
+    tokenMintAddress,
+    startDateInclusive,
+    endDateExclusive
+  );
+
+  // marry together the two and return a combined list
+  // note, after some manual testing, there's a lot of buggy data on solana.fm for the /account-inputs/tokens/{token}
+  // call. sometimes txns are missing entirely (even if it shows up in /account-inputs/{account} and sometimes the
+  // postBalance is completely wrong so its incoming/outgoing is miscategorized
+  // so SFM is probably useful just for the `balance` field and can defer 100% to bitquery for outgoing/incoming txns
+  // (in theory we could use SFM to sanity check that bitquery has correct transactions where the value is >= 1, but
+  // because they have scraping errors sometimes that completely miscategorize them it doesn't seem work the effort)
+  return Object.values(tokenAccountsInfoBQMap).map((bqAccountInfo) => {
+    const sfmAccountInfo = tokenAccountsInfoSFMMap
+      ? tokenAccountsInfoSFMMap[bqAccountInfo.tokenAccountAddress]
+      : undefined;
+
+    // defer to solana.fm balance but since it's often missing, we can use bitquery balanceChange info too
+    // if it's positive (if it's negative, too hard to try and tie together from previous days, just don't save
+    // the row)
+    const bitqueryMinimumBalance =
+      bqAccountInfo.balanceChange > 0
+        ? bqAccountInfo.balanceChange * 10 ** tokenMintDecimals
+        : undefined;
+    const approximateMinimumBalance = sfmAccountInfo?.balance
+      ? sfmAccountInfo?.balance * 10 ** tokenMintDecimals
+      : bitqueryMinimumBalance;
+
+    return {
+      tokenAccountAddress: bqAccountInfo.tokenAccountAddress,
+      ownerAccountAddress: bqAccountInfo.ownerAccountAddress,
+      approximateMinimumBalance: approximateMinimumBalance
+        ? // make sure to round this to an int, sometimes the APIs return weird values more than 9 decimals
+          Math.round(approximateMinimumBalance)
+        : undefined,
+      incomingTransactions: bqAccountInfo.incomingTransactions,
+      outgoingTransactions: bqAccountInfo.outgoingTransactions,
+    };
+  });
 }

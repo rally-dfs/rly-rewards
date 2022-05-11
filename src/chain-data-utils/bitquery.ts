@@ -187,6 +187,7 @@ export async function allTransfersBetweenDatesBitquery(
 
 export type BitqueryTokenAccountInfo = {
   tokenAccountAddress: string;
+  ownerAccountAddress?: string;
   balanceChange: number;
   incomingTransactions: Set<string>;
   outgoingTransactions: Set<string>;
@@ -229,6 +230,7 @@ export async function tokenAccountsInfoBetweenDatesBitquery(
     if (accountInfoMap[result.sender.mintAccount] === undefined) {
       accountInfoMap[result.sender.mintAccount] = {
         tokenAccountAddress: result.sender.mintAccount,
+        ownerAccountAddress: result.sender.address,
         balanceChange: 0,
         incomingTransactions: new Set<string>(),
         outgoingTransactions: new Set<string>(),
@@ -238,6 +240,7 @@ export async function tokenAccountsInfoBetweenDatesBitquery(
     if (accountInfoMap[result.receiver.mintAccount] === undefined) {
       accountInfoMap[result.receiver.mintAccount] = {
         tokenAccountAddress: result.receiver.mintAccount,
+        ownerAccountAddress: result.receiver.address,
         balanceChange: 0,
         incomingTransactions: new Set<string>(),
         outgoingTransactions: new Set<string>(),
