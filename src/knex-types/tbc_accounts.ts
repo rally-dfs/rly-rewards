@@ -1,5 +1,5 @@
 export interface TBCAccount {
-  id: number;
+  id?: number;
   init_transaction_hash: Uint8Array;
   token_a_account_address: Uint8Array;
   token_a_account_owner_address: Uint8Array;
@@ -7,7 +7,7 @@ export interface TBCAccount {
 }
 
 export interface TBCAccountBalance {
-  id: number;
+  id?: number;
   tbc_account_id: number;
   datetime: Date;
   balance: number;

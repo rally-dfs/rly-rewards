@@ -1,5 +1,5 @@
 export interface TokenMint {
-  id: number;
+  id?: number;
   mint_address: Uint8Array;
   decimals: number;
 }
