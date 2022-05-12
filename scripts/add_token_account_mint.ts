@@ -2,7 +2,7 @@ import { getKnex, closeKnexConnection } from "../src/database";
 import { PublicKey } from "@solana/web3.js";
 import { TokenAccountMint } from "../src/knex-types/token_accounts";
 
-/** Inserts new row to tbc_accounts
+/** Inserts new row to tbc_account_mints
  *
  * arg 1 is mint_address
  * arg 2 is decimals

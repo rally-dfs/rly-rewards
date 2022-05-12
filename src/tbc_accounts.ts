@@ -63,13 +63,17 @@ export async function getDailyTokenBalances(
   }
 
   let query = knex("tbc_accounts")
-    .join("token_mints", "tbc_accounts.token_a_mint_id", "token_mints.id")
+    .join(
+      "tbc_token_mints",
+      "tbc_accounts.token_a_mint_id",
+      "tbc_token_mints.id"
+    )
     .select(
       "tbc_accounts.id as tbc_account_id",
       "tbc_accounts.token_a_account_address",
       "tbc_accounts.token_a_account_owner_address",
-      "token_mints.mint_address",
-      "token_mints.decimals"
+      "tbc_token_mints.mint_address",
+      "tbc_token_mints.decimals"
     );
 
   if (tbcAccountIds !== undefined) {

@@ -1,13 +1,13 @@
 import { getKnex, closeKnexConnection } from "../src/database";
 import { PublicKey } from "@solana/web3.js";
-import { TokenMint } from "../src/knex-types/token_mints";
+import { TBCTokenMint } from "../src/knex-types/tbc_accounts";
 
-/** Inserts new row to tbc_accounts
+/** Inserts new row to tbc_token_mints
  *
  * arg 1 is mint_address
  * arg 2 is decimals
  *
- * e.g. $ npm run add-token-mint RLYv2ubRMDLcGG2UyvPmnPmkfuQTsMbg4Jtygc7dmnq 9
+ * e.g. $ npm run add-tbc-token-mint RLYv2ubRMDLcGG2UyvPmnPmkfuQTsMbg4Jtygc7dmnq 9
  */
 const main = async () => {
   const knex = getKnex();
@@ -21,7 +21,7 @@ const main = async () => {
     `Adding token mint ${mintAddressString}, decimals: ${decimalsString}`
   );
 
-  const result = await knex<TokenMint>("token_mints").insert(
+  const result = await knex<TBCTokenMint>("tbc_token_mints").insert(
     {
       mint_address: new PublicKey(mintAddressString!).toBytes(),
       decimals: parseInt(decimalsString!),

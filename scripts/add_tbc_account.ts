@@ -1,7 +1,6 @@
 import { getKnex, closeKnexConnection } from "../src/database";
 import { PublicKey } from "@solana/web3.js";
-import { TBCAccount } from "../src/knex-types/tbc_accounts";
-import { TokenMint } from "../src/knex-types/token_mints";
+import { TBCAccount, TBCTokenMint } from "../src/knex-types/tbc_accounts";
 import bs58 from "bs58";
 
 /** Inserts new row to tbc_accounts
@@ -12,9 +11,9 @@ import bs58 from "bs58";
  * arg 4 is token_a_mint_address: mint address of token A (usually sRLY)
  *
  * e.g. $ npm run add-tbc-account \
- * 66tnH1qyBeNMWsGf5ZZUijK14RbzQ9JJ8ZUP15ayrGXMTAQnYPe4S7jhBZ1joHRpBib2khjweTiTXJUs1NfVuGqr \
- * 4Fce62WKxUeBrR7ShrxjC4WL6gcyeTEUyByCdFufBQuC Eh9mq1m2X2MgiZGd2hfMEbAuKZcbdXTo7EqFUcT9EyVS \
- * RLYv2ubRMDLcGG2UyvPmnPmkfuQTsMbg4Jtygc7dmnq
+ 66tnH1qyBeNMWsGf5ZZUijK14RbzQ9JJ8ZUP15ayrGXMTAQnYPe4S7jhBZ1joHRpBib2khjweTiTXJUs1NfVuGqr \
+ 4Fce62WKxUeBrR7ShrxjC4WL6gcyeTEUyByCdFufBQuC Eh9mq1m2X2MgiZGd2hfMEbAuKZcbdXTo7EqFUcT9EyVS \
+ RLYv2ubRMDLcGG2UyvPmnPmkfuQTsMbg4Jtygc7dmnq
  */
 const main = async () => {
   const knex = getKnex();
@@ -44,7 +43,7 @@ const main = async () => {
       `${tokenAAccountOwnerAddressString}, ${tokenAMintAddressString}`
   );
 
-  const tokenAMintRow = await knex<TokenMint>("token_mints")
+  const tokenAMintRow = await knex<TBCTokenMint>("tbc_token_mints")
     .select()
     .where({ mint_address: tokenAMintAddress });
 

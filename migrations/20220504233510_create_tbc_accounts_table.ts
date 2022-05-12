@@ -8,7 +8,7 @@ export async function up(knex: Knex): Promise<void> {
     table.binary("token_a_account_address", 32).notNullable().unique();
     table.binary("token_a_account_owner_address", 32).notNullable();
     table.integer("token_a_mint_id").unsigned().notNullable();
-    table.foreign("token_a_mint_id").references("token_mints.id");
+    table.foreign("token_a_mint_id").references("tbc_token_mints.id");
 
     table.unique(["token_a_account_owner_address", "token_a_mint_id"]);
   });
