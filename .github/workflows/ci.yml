@@ -1,33 +1,32 @@
 # This workflow will do a clean install of node dependencies, build the source code and run tests across different versions of node
 # For more information see: https://help.github.com/actions/language-and-framework-guides/using-nodejs-with-github-actions
 
-name: Standard React CI
+name: Project CI
 
 on:
   workflow_dispatch:
   push:
-    branches: [ master ]
+    branches: [main]
   pull_request:
-    branches: [master]
+    branches: [main]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
-    env:
-      EXTEND_ESLINT: true
-
     steps:
-    - uses: actions/checkout@v2
-    - name: Use Node.js
-      uses: actions/setup-node@v1
-      with:
-        node-version: 12.21.0
-    - name: Install dependencies
-      run: yarn install --frozen-lockfile
-    - name: Compile Typescript
-      run: npx tsc
-    - name: Prettier + basic lint
-      run: yarn lint
-    - name: Build for browser
-      run: CI=FALSE yarn build
+      - uses: actions/checkout@v2
+
+      - name: Use Node.js
+        uses: actions/setup-node@v1
+        with:
+          node-version: 16.14.2
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Compile Typescript
+        run: npm run build
+
+      - name: Check code formatting
+        run: npx prettier --check .
