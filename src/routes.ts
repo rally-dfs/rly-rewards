@@ -1,7 +1,8 @@
 import { PublicKey } from "@solana/web3.js";
 import { Router } from "express";
 import { getKnex } from "./database";
-import { TBCAccount, TBCAccountBalance } from "./knex-types/tbc_accounts";
+import { TBCAccount} from "./knex-types/tbc_account";
+import { TBCAccountBalance } from "./knex-types/tbc_account_balance";
 
 const routes = Router();
 

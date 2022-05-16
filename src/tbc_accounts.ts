@@ -1,7 +1,7 @@
 import { getKnex } from "./database";
 import { PublicKey } from "@solana/web3.js";
-import { TBCAccountBalance } from "./knex-types/tbc_accounts";
 import { getDailyTokenBalancesBetweenDates } from "./chain-data-utils/combinedQueries";
+import { TBCAccountBalance } from "./knex-types/tbc_account_balance";
 
 /** Calls getDailyTokenBalancesBetweenDates for all token accounts, starting from the last date whose balance we have */
 export async function getAllDailyTokenBalancesSinceLastFetch() {
