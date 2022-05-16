@@ -3,7 +3,7 @@ import { clusterApiUrl, Connection } from "@solana/web3.js";
 import {
   latestAccountInputsOnDateSolanaFm,
   tokenAccountsInfoBetweenDatesSolanaFm,
-} from "./solanaFm";
+} from "./solana_fm";
 import {
   allTransfersBetweenDatesBitquery,
   tokenAccountsInfoBetweenDatesBitquery,
