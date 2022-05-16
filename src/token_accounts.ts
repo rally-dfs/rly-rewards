@@ -1,6 +1,6 @@
 import { getKnex } from "./database";
 import { PublicKey } from "@solana/web3.js";
-import { getAllTokenAccountInfoAndTransactions } from "./chain-data-utils/combinedQueries";
+import { getAllTokenAccountInfoAndTransactions } from "./chain-data-utils/combined_queries";
 import {
   TokenAccount,
 } from "./knex-types/token_account";
