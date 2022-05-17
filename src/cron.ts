@@ -13,7 +13,8 @@ export function initCron() {
       latestEndDate.toISOString().substring(0, 10)
     );
     await getAllTokenAccountInfoAndTransactionsForEndDate(
-      latestEndDate.toISOString().substring(0, 10)
+      latestEndDate.toISOString().substring(0, 10),
+      false
     );
   });
 }
