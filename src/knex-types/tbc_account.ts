@@ -5,10 +5,3 @@ export interface TBCAccount {
   token_a_account_owner_address: Uint8Array;
   token_a_mint_id: number;
 }
-
-export interface TBCAccountBalance {
-  id?: number;
-  tbc_account_id: number;
-  datetime: Date;
-  balance: number;
-}

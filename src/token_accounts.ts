@@ -1,12 +1,12 @@
 import { getKnex } from "./database";
 import { PublicKey } from "@solana/web3.js";
-import { getAllTokenAccountInfoAndTransactions } from "./chain-data-utils/combinedQueries";
+import { getAllTokenAccountInfoAndTransactions } from "./chain-data-utils/combined_queries";
 import {
   TokenAccount,
-  TokenAccountBalance,
-  TokenAccountTransaction,
-} from "./knex-types/token_accounts";
+} from "./knex-types/token_account";
 import bs58 from "bs58";
+import { TokenAccountBalance } from "./knex-types/token_account_balance";
+import { TokenAccountTransaction } from "./knex-types/token_account_transaction";
 
 // TODO: there's currently no bulk version of this call since it's so large, it must be run one day at a time. It'd
 // be useful to have one similar to tbc_accounts.getAllDailyTokenBalancesSinceLastFetch, we'd need to get max(datetime)
