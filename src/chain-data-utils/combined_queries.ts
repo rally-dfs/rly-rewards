@@ -52,7 +52,7 @@ export async function tokenAccountBalanceOnDate(
   if (transfersBQ[0]) {
     // should probably log this and manually investigate this, bitquery txns are unordered and don't include
     // a timestamp so we have to settle for just picking the first one
-    console.log(
+    console.error(
       "Found txn in BQ not found in SFM, should double check this day's data manually",
       transfersBQ
     );
@@ -63,6 +63,7 @@ export async function tokenAccountBalanceOnDate(
     : latestAccountInputSFM?.transactionHash;
 
   if (latestTxnHash === undefined) {
+    // both solana.fm and bitquery didn't return any txns, likely just no txns on that day
     return previousBalance;
   }
 
@@ -158,10 +159,16 @@ export async function getDailyTokenBalancesBetweenDates(
       previousEndDateExclusive = new Date(currentEndDateExclusive);
       previousBalance = balance;
     } catch (error) {
-      console.log("Error fetching balance", error);
-      allBalances.push({ dateExclusive: currentEndDateExclusive, balance: -1 });
+      console.error(
+        "Error fetching balance",
+        tokenAccountAddress,
+        currentEndDateExclusive,
+        previousEndDateExclusive,
+        error
+      );
 
-      // leave previousDate/previousBalance the same, can try again from there the next loop
+      // just don't add anything to allBalances, it's ok if there's a gap in dates
+      // also leave previousDate/previousBalance the same, can try again from the existing previousDate on the next loop
     }
 
     // since endDate is exclusive and startDate is inclusive (in the call to _transferAmountsWithFilter inside
