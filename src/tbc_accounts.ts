@@ -4,7 +4,9 @@ import { getDailyTokenBalancesBetweenDates } from "./chain-data-utils/combined_q
 import { TBCAccountBalance } from "./knex-types/tbc_account_balance";
 
 /** Calls getDailyTokenBalancesBetweenDates for all token accounts, starting from the last date whose balance we have */
-export async function getAllDailyTokenBalancesSinceLastFetch() {
+export async function getAllDailyTokenBalancesSinceLastFetch(
+  latestEndDateString: string
+) {
   const knex = getKnex();
 
   // get the max(datetime) grouped by token accounts
@@ -28,13 +30,9 @@ export async function getAllDailyTokenBalancesSinceLastFetch() {
       )
     );
 
-    // wait ~48 hours from today to be safe, sometimes the solana/bitquery APIs are behind (could maybe cut this down
-    // if we really want, need to investigate a bit exactly how long it takes)
-    const latestEndDate = new Date(new Date().valueOf() - 48 * 3600 * 1000);
-
     await getDailyTokenBalances(
       earliestEndDate.toISOString().substring(0, 10),
-      latestEndDate.toISOString().substring(0, 10),
+      latestEndDateString,
       [accountLatestDate.tbc_account_id]
     );
   }
