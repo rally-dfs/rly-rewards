@@ -1,6 +1,6 @@
 import { getKnex, closeKnexConnection } from "../src/database";
 import { PublicKey } from "@solana/web3.js";
-import { TBCTokenMint } from "../src/knex-types/tbc_accounts";
+import { TBCTokenMint } from "../src/knex-types/tbc_token_mint";
 
 /** Inserts new row to tbc_token_mints
  *

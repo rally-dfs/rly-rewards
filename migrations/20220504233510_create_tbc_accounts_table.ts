@@ -3,7 +3,7 @@ import { Knex } from "knex";
 export async function up(knex: Knex): Promise<void> {
   return knex.schema.createTable("tbc_accounts", function (table) {
     table.increments();
-    table.binary("init_transaction_hash", 64).notNullable().unique();
+    table.binary("init_transaction_hash", 64).unique();
 
     table.binary("token_a_account_address", 32).notNullable().unique();
     table.binary("token_a_account_owner_address", 32).notNullable();
