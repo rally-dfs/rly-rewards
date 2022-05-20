@@ -11,22 +11,19 @@ import { TokenAccountTransaction } from "./knex-types/token_account_transaction"
 // across all token_account_transactions to figure out when the last successful run per mint was, and then call
 // getAllTokenAccountInfoAndTransactionsForEndDate in a loop
 
-/** Calls getAllTokenAccountInfoAndTransactions for all token accounts from `end date minus 24 hours` (inclusive)
- * to `end date` (exclusive).
+/** Calls getAllTokenAccountInfoAndTransactions for all token accounts from `previously fetched end date + 24 hours`
+ * (inclusive) to `end date` (exclusive).
  * Note that the date is always interpreted as 00:00 UTC for consistency (i.e. you can't pass a specific time,
  * only dates, that's why they're accepted as strings)
  *
- * @param endDateString
+ * @param lastEndDateString
+ * @param forceOneDay if true, will get 24 hours of data instead of getting data from the previously fetched end date
  */
 export async function getAllTokenAccountInfoAndTransactionsForEndDate(
-  endDateString: string
+  lastEndDateString: string,
+  forceOneDay: boolean
 ) {
   const knex = getKnex();
-
-  const endDateExclusive = new Date(`${endDateString}T00:00:00Z`);
-  const startDateInclusive = new Date(
-    endDateExclusive.valueOf() - 24 * 3600 * 1000
-  );
 
   // TODO: this is a pretty huge query, it's mostly needed to map token_address => ids when inserting into
   // token_account_balances and token_account_transactions below but we could probably avoid this if we did more
@@ -80,157 +77,230 @@ export async function getAllTokenAccountInfoAndTransactionsForEndDate(
 
   const allMintIds = Object.keys(tokenAccountsByMint);
 
+  const maxDateByMintId: { mint_id: number; max_datetime: Date }[] = await knex(
+    "token_account_transactions"
+  )
+    .join(
+      "token_accounts",
+      "token_accounts.id",
+      "token_account_transactions.token_account_id"
+    )
+    .select("token_accounts.mint_id")
+    .where("datetime", "<", lastEndDateString)
+    .max("datetime as max_datetime")
+    .groupBy("token_accounts.mint_id");
+
   for (let i = 0; i < allMintIds.length; i++) {
     const mintId = allMintIds[i]!;
     const mintAddress = tokenAccountsByMint[mintId]!.mint_address;
     const decimals = tokenAccountsByMint[mintId]!.decimals;
     const accountsMap = tokenAccountsByMint[mintId]!.accounts!;
 
-    const accountInfos = await getAllTokenAccountInfoAndTransactions(
-      mintAddress,
-      decimals,
-      startDateInclusive,
-      endDateExclusive
-    );
+    const lastEndDate = new Date(`${lastEndDateString}T00:00:00Z`);
 
-    // first insert all the TokenAccounts
-    const tokenAccountsResults = await knex<TokenAccount>("token_accounts")
-      .insert(
-        accountInfos.map((accountInfo) => {
-          return {
-            address: new PublicKey(accountInfo.tokenAccountAddress).toBytes(),
-            owner_address: accountInfo.ownerAccountAddress
-              ? new PublicKey(accountInfo.ownerAccountAddress).toBytes()
-              : undefined,
-            mint_id: parseInt(mintId),
-            first_transaction_date: endDateExclusive,
-          };
-        }),
-        "*" // need this for postgres to return the added result
-      )
-      .onConflict(["address"])
-      // update first_transaction_date if endDateExclusive is further in the past (i.e. if we called this for a date
-      // backwards in time than the existing data)
-      .merge({ first_transaction_date: endDateExclusive })
-      .where("token_accounts.first_transaction_date", ">", endDateExclusive);
+    // if we have some past data (and the `forceOneDay` flag is off), start with day + 1.
+    // otherwise just start with lastEndDate and do one iteration
+    const maxDate = maxDateByMintId.find(
+      (value) => value.mint_id === parseInt(mintId)
+    )?.max_datetime;
+    const maxDatePlusOne = maxDate
+      ? new Date(
+          new Date(
+            // truncate to day boundary (just in case there's some inconsistent data in maxDate)
+            `${maxDate?.toISOString().substring(0, 10)}T00:00:00Z`
+          ).valueOf() +
+            24 * 3600 * 1000
+        )
+      : undefined;
 
-    // update accountsMap with the newly added items (tokenAccountResults doesn't include the already existing
-    // rows that weren't inserted)
-    const updatedAccountsMap = tokenAccountsResults.reduce(
-      (accountsMap, result) => {
-        accountsMap[new PublicKey(result.address).toString()] =
-          result.id!.toString();
-        return accountsMap;
-      },
-      accountsMap
-    );
+    let currentEndDate =
+      maxDatePlusOne && !forceOneDay ? maxDatePlusOne : lastEndDate;
 
-    const filteredAccountInfos = accountInfos.filter((accountInfo) => {
-      if (!updatedAccountsMap[accountInfo.tokenAccountAddress]) {
-        // this shouldn't ever happen, means something with the above merging logic went wrong
-        console.error(
-          "updatedAccountsMap missing address",
-          accountInfo.tokenAccountAddress
-        );
-        return false;
-      }
-      return true;
+    while (currentEndDate <= lastEndDate) {
+      await _getTokenAccountInfoForMintAndEndDate(
+        mintId,
+        mintAddress,
+        decimals,
+        accountsMap,
+        currentEndDate
+      );
+
+      currentEndDate = new Date(currentEndDate.valueOf() + 24 * 3600 * 1000);
+    }
+  }
+}
+
+/** Helper function that fetches account info for `end date minus 24 hours` to `endDate` and inserts into DB.
+ * Would need to refactor better to make it usable externally (it currently requires some specific set up/data
+ * prefetching)
+ *
+ * @param mintId
+ * @param mintAddress
+ * @param decimals
+ * @param accountsMap
+ * @param endDateExclusive
+ */
+async function _getTokenAccountInfoForMintAndEndDate(
+  mintId: string,
+  mintAddress: string,
+  decimals: number,
+  accountsMap: { [key: string]: string },
+  endDateExclusive: Date
+) {
+  const knex = getKnex();
+
+  const startDateInclusive = new Date(
+    endDateExclusive.valueOf() - 24 * 3600 * 1000
+  );
+
+  const accountInfos = await getAllTokenAccountInfoAndTransactions(
+    mintAddress,
+    decimals,
+    startDateInclusive,
+    endDateExclusive
+  );
+
+  if (accountInfos.length == 0) {
+    return;
+  }
+
+  // first insert all the TokenAccounts
+  const tokenAccountsResults = await knex<TokenAccount>("token_accounts")
+    .insert(
+      accountInfos.map((accountInfo) => {
+        return {
+          address: new PublicKey(accountInfo.tokenAccountAddress).toBytes(),
+          owner_address: accountInfo.ownerAccountAddress
+            ? new PublicKey(accountInfo.ownerAccountAddress).toBytes()
+            : undefined,
+          mint_id: parseInt(mintId),
+          first_transaction_date: endDateExclusive,
+        };
+      }),
+      "*" // need this for postgres to return the added result
+    )
+    .onConflict(["address"])
+    // update first_transaction_date if endDateExclusive is further in the past (i.e. if we called this for a date
+    // backwards in time than the existing data)
+    .merge({ first_transaction_date: endDateExclusive })
+    .where("token_accounts.first_transaction_date", ">", endDateExclusive);
+
+  // update accountsMap with the newly added items (tokenAccountResults doesn't include the already existing
+  // rows that weren't inserted)
+  const updatedAccountsMap = tokenAccountsResults.reduce(
+    (accountsMap, result) => {
+      accountsMap[new PublicKey(result.address).toString()] =
+        result.id!.toString();
+      return accountsMap;
+    },
+    accountsMap
+  );
+
+  const filteredAccountInfos = accountInfos.filter((accountInfo) => {
+    if (!updatedAccountsMap[accountInfo.tokenAccountAddress]) {
+      // this shouldn't ever happen, means something with the above merging logic went wrong
+      console.error(
+        "updatedAccountsMap missing address",
+        accountInfo.tokenAccountAddress
+      );
+      return false;
+    }
+    return true;
+  });
+
+  // next insert all the TokenAccountBalances
+  // TODO: currently if day_n has a row and day_n+1 has no row, it implies the balance is unchanged
+  // this makes reading "what was balance on x date" less efficient - if it becomes a problem we could probably
+  // just create a new denormalized table that stores the daily counts of non-zero balance accounts or something
+  const tokenAccountBalancesRows = filteredAccountInfos
+    .filter((accountInfo) => {
+      // balance is optional due to solana.fm flakiness so just skip those rows if they don't exist
+      return accountInfo.approximateMinimumBalance !== undefined;
+    })
+    .map((accountInfo) => {
+      return {
+        token_account_id: parseInt(
+          updatedAccountsMap[accountInfo.tokenAccountAddress]!
+        ),
+        datetime: endDateExclusive,
+        approximate_minimum_balance: accountInfo.approximateMinimumBalance,
+      };
     });
 
-    // next insert all the TokenAccountBalances
-    // TODO: currently if day_n has a row and day_n+1 has no row, it implies the balance is unchanged
-    // this makes reading "what was balance on x date" less efficient - if it becomes a problem we could probably
-    // just create a new denormalized table that stores the daily counts of non-zero balance accounts or something
-    const tokenAccountBalancesRows = filteredAccountInfos
-      .filter((accountInfo) => {
-        // balance is optional due to solana.fm flakiness so just skip those rows if they don't exist
-        return accountInfo.approximateMinimumBalance !== undefined;
+  if (tokenAccountBalancesRows.length > 0) {
+    await knex<TokenAccountBalance>("token_account_balances")
+      .insert(
+        tokenAccountBalancesRows,
+        "*" // need this for postgres to return the added result
+      )
+      .onConflict(["token_account_id", "datetime"])
+      .merge(); // just update the balance if there's a conflict
+  }
+
+  // finally, insert the TokenAccountTransactions
+  const incomingTransactionRows: TokenAccountTransaction[] = [];
+  const outgoingTransactionRows: TokenAccountTransaction[] = [];
+
+  filteredAccountInfos.forEach((accountInfo) => {
+    // convert string => Uint8Array
+    const incomingHashes = [...accountInfo.incomingTransactions]
+      .map((transaction) => {
+        const transactionHash = bs58.decode(transaction);
+        return transactionHash.length === 64 ? transactionHash : undefined;
       })
-      .map((accountInfo) => {
+      .filter((hash) => hash !== undefined);
+
+    const outgoingHashes = [...accountInfo.outgoingTransactions]
+      .map((transaction) => {
+        const transactionHash = bs58.decode(transaction);
+        return transactionHash.length === 64 ? transactionHash : undefined;
+      })
+      .filter((hash) => hash !== undefined);
+
+    incomingTransactionRows.push(
+      ...incomingHashes.map((hash) => {
         return {
           token_account_id: parseInt(
             updatedAccountsMap[accountInfo.tokenAccountAddress]!
           ),
           datetime: endDateExclusive,
-          approximate_minimum_balance: accountInfo.approximateMinimumBalance,
+          transaction_hash: hash!,
+          transfer_in: true,
         };
-      });
+      })
+    );
 
-    if (tokenAccountBalancesRows.length > 0) {
-      await knex<TokenAccountBalance>("token_account_balances")
-        .insert(
-          tokenAccountBalancesRows,
-          "*" // need this for postgres to return the added result
-        )
-        .onConflict(["token_account_id", "datetime"])
-        .merge(); // just update the balance if there's a conflict
-    }
+    outgoingTransactionRows.push(
+      ...outgoingHashes.map((hash) => {
+        return {
+          token_account_id: parseInt(
+            updatedAccountsMap[accountInfo.tokenAccountAddress]!
+          ),
+          datetime: endDateExclusive,
+          transaction_hash: hash!,
+          transfer_in: false,
+        };
+      })
+    );
+  });
 
-    // finally, insert the TokenAccountTransactions
-    const incomingTransactionRows: TokenAccountTransaction[] = [];
-    const outgoingTransactionRows: TokenAccountTransaction[] = [];
+  if (incomingTransactionRows.length > 0) {
+    await knex<TokenAccountTransaction>("token_account_transactions")
+      .insert(
+        incomingTransactionRows,
+        "*" // need this for postgres to return the added result
+      )
+      .onConflict(["token_account_id", "transaction_hash"])
+      .ignore(); // can just ignore if we already have this account saved
+  }
 
-    filteredAccountInfos.forEach((accountInfo) => {
-      // convert string => Uint8Array
-      const incomingHashes = [...accountInfo.incomingTransactions]
-        .map((transaction) => {
-          const transactionHash = bs58.decode(transaction);
-          return transactionHash.length === 64 ? transactionHash : undefined;
-        })
-        .filter((hash) => hash !== undefined);
-
-      const outgoingHashes = [...accountInfo.outgoingTransactions]
-        .map((transaction) => {
-          const transactionHash = bs58.decode(transaction);
-          return transactionHash.length === 64 ? transactionHash : undefined;
-        })
-        .filter((hash) => hash !== undefined);
-
-      incomingTransactionRows.push(
-        ...incomingHashes.map((hash) => {
-          return {
-            token_account_id: parseInt(
-              updatedAccountsMap[accountInfo.tokenAccountAddress]!
-            ),
-            datetime: endDateExclusive,
-            transaction_hash: hash!,
-            transfer_in: true,
-          };
-        })
-      );
-
-      outgoingTransactionRows.push(
-        ...outgoingHashes.map((hash) => {
-          return {
-            token_account_id: parseInt(
-              updatedAccountsMap[accountInfo.tokenAccountAddress]!
-            ),
-            datetime: endDateExclusive,
-            transaction_hash: hash!,
-            transfer_in: false,
-          };
-        })
-      );
-    });
-
-    if (incomingTransactionRows.length > 0) {
-      await knex<TokenAccountTransaction>("token_account_transactions")
-        .insert(
-          incomingTransactionRows,
-          "*" // need this for postgres to return the added result
-        )
-        .onConflict(["token_account_id", "transaction_hash"])
-        .ignore(); // can just ignore if we already have this account saved
-    }
-
-    if (outgoingTransactionRows.length > 0) {
-      await knex<TokenAccountTransaction>("token_account_transactions")
-        .insert(
-          outgoingTransactionRows,
-          "*" // need this for postgres to return the added result
-        )
-        .onConflict(["token_account_id", "transaction_hash"])
-        .ignore(); // can just ignore if we already have this account saved
-    }
+  if (outgoingTransactionRows.length > 0) {
+    await knex<TokenAccountTransaction>("token_account_transactions")
+      .insert(
+        outgoingTransactionRows,
+        "*" // need this for postgres to return the added result
+      )
+      .onConflict(["token_account_id", "transaction_hash"])
+      .ignore(); // can just ignore if we already have this account saved
   }
 }
