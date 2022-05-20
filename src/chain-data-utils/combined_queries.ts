@@ -5,8 +5,8 @@ import {
   tokenAccountsInfoBetweenDatesSolanaFm,
 } from "./solana_fm";
 import {
-  allTransfersBetweenDatesBitquery,
-  tokenAccountsInfoBetweenDatesBitquery,
+  allSolanaTransfersBetweenDatesBitquery,
+  solanaTokenAccountsInfoBetweenDatesBitquery,
 } from "./bitquery";
 
 const SOL_NETWORK = "mainnet-beta";
@@ -37,7 +37,7 @@ export async function tokenAccountBalanceOnDate(
 
   // this will only be non empty if there was some missing txn in SFM, checking just in case
   const transfersBQ = (
-    await allTransfersBetweenDatesBitquery(
+    await allSolanaTransfersBetweenDatesBitquery(
       tokenAccountAddress,
       tokenAccountOwnerAddress,
       tokenMintAddress,
@@ -222,11 +222,12 @@ export async function getAllTokenAccountInfoAndTransactions(
 
   // bitquery token accounts info
   // note this returns delta(balance) from startDate instead of actual balance (not used for now)
-  let tokenAccountsInfoBQMap = await tokenAccountsInfoBetweenDatesBitquery(
-    tokenMintAddress,
-    startDateInclusive,
-    endDateExclusive
-  );
+  let tokenAccountsInfoBQMap =
+    await solanaTokenAccountsInfoBetweenDatesBitquery(
+      tokenMintAddress,
+      startDateInclusive,
+      endDateExclusive
+    );
 
   // marry together the two and return a combined list
   // note, after some manual testing, there's a lot of buggy data on solana.fm for the /account-inputs/tokens/{token}
