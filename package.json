@@ -6,6 +6,7 @@
   "scripts": {
     "format": "prettier -w .",
     "build": "tsc -p tsconfig.json",
+    "test": "ts-mocha --exit tests/**/*.ts",
     "dev": "nodemon src/server.ts",
     "prod": "node dist/server.js",
     "prestart": "./node_modules/.bin/knex migrate:latest",
@@ -36,8 +37,15 @@
     "typescript": "^4.6.4"
   },
   "devDependencies": {
+    "@types/chai": "^4.3.1",
+    "@types/mocha": "^9.1.1",
+    "@types/supertest": "^2.0.12",
+    "chai": "^4.3.6",
+    "mocha": "^10.0.0",
     "nodemon": "^2.0.16",
     "prettier": "^2.6.2",
+    "supertest": "^6.2.3",
+    "ts-mocha": "^10.0.0",
     "ts-node": "^10.7.0"
   }
 }
