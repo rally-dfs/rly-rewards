@@ -144,6 +144,10 @@ async function _getTokenAccountInfoForMintAndEndDate(
 ) {
   const knex = getKnex();
 
+  // from testing, there's a ~10K row insert limit, split the inserts into chunks in case there's too many (probably
+  // would mostly only happen with transactions)
+  const chunkSize = 10000;
+
   const startDateInclusive = new Date(
     endDateExclusive.valueOf() - 24 * 3600 * 1000
   );
@@ -160,42 +164,43 @@ async function _getTokenAccountInfoForMintAndEndDate(
   }
 
   // first insert all the TokenAccounts
-  const tokenAccountsResults = await knex<TokenAccount>("token_accounts")
-    .insert(
-      accountInfos.map((accountInfo) => {
-        return {
-          address: new PublicKey(accountInfo.tokenAccountAddress).toBytes(),
-          owner_address: accountInfo.ownerAccountAddress
-            ? new PublicKey(accountInfo.ownerAccountAddress).toBytes()
-            : undefined,
-          mint_id: parseInt(mintId),
-          first_transaction_date: endDateExclusive,
-        };
-      }),
-      "*" // need this for postgres to return the added result
-    )
-    .onConflict(["address"])
-    // update first_transaction_date if endDateExclusive is further in the past (i.e. if we called this for a date
-    // backwards in time than the existing data)
-    .merge({ first_transaction_date: endDateExclusive })
-    .where("token_accounts.first_transaction_date", ">", endDateExclusive);
+  const tokenAccounts = accountInfos.map((accountInfo) => {
+    return {
+      address: new PublicKey(accountInfo.tokenAccountAddress).toBytes(),
+      owner_address: accountInfo.ownerAccountAddress
+        ? new PublicKey(accountInfo.ownerAccountAddress).toBytes()
+        : undefined,
+      mint_id: parseInt(mintId),
+      first_transaction_date: endDateExclusive,
+    };
+  });
 
-  // update accountsMap with the newly added items (tokenAccountResults doesn't include the already existing
-  // rows that weren't inserted)
-  const updatedAccountsMap = tokenAccountsResults.reduce(
-    (accountsMap, result) => {
+  for (let i = 0; i < tokenAccounts.length; i += chunkSize) {
+    const tokenAccountsResults = await knex<TokenAccount>("token_accounts")
+      .insert(
+        tokenAccounts.slice(i, i + chunkSize),
+        "*" // need this for postgres to return the added result
+      )
+      .onConflict(["address"])
+      // update first_transaction_date if endDateExclusive is further in the past (i.e. if we called this for a date
+      // backwards in time than the existing data)
+      .merge({ first_transaction_date: endDateExclusive })
+      .where("token_accounts.first_transaction_date", ">", endDateExclusive);
+
+    // update accountsMap with the newly added items (tokenAccountResults doesn't include the already existing
+    // rows that weren't inserted)
+    tokenAccountsResults.reduce((accountsMap, result) => {
       accountsMap[new PublicKey(result.address).toString()] =
         result.id!.toString();
       return accountsMap;
-    },
-    accountsMap
-  );
+    }, accountsMap);
+  }
 
   const filteredAccountInfos = accountInfos.filter((accountInfo) => {
-    if (!updatedAccountsMap[accountInfo.tokenAccountAddress]) {
+    if (!accountsMap[accountInfo.tokenAccountAddress]) {
       // this shouldn't ever happen, means something with the above merging logic went wrong
       console.error(
-        "updatedAccountsMap missing address",
+        "updated accountsMap missing address",
         accountInfo.tokenAccountAddress
       );
       return false;
@@ -215,7 +220,7 @@ async function _getTokenAccountInfoForMintAndEndDate(
     .map((accountInfo) => {
       return {
         token_account_id: parseInt(
-          updatedAccountsMap[accountInfo.tokenAccountAddress]!
+          accountsMap[accountInfo.tokenAccountAddress]!
         ),
         datetime: endDateExclusive,
         approximate_minimum_balance: accountInfo.approximateMinimumBalance,
@@ -223,13 +228,15 @@ async function _getTokenAccountInfoForMintAndEndDate(
     });
 
   if (tokenAccountBalancesRows.length > 0) {
-    await knex<TokenAccountBalance>("token_account_balances")
-      .insert(
-        tokenAccountBalancesRows,
-        "*" // need this for postgres to return the added result
-      )
-      .onConflict(["token_account_id", "datetime"])
-      .merge(); // just update the balance if there's a conflict
+    for (let i = 0; i < tokenAccountBalancesRows.length; i += chunkSize) {
+      await knex<TokenAccountBalance>("token_account_balances")
+        .insert(
+          tokenAccountBalancesRows.slice(i, i + chunkSize),
+          "*" // need this for postgres to return the added result
+        )
+        .onConflict(["token_account_id", "datetime"])
+        .merge(); // just update the balance if there's a conflict
+    }
   }
 
   // finally, insert the TokenAccountTransactions
@@ -256,7 +263,7 @@ async function _getTokenAccountInfoForMintAndEndDate(
       ...incomingHashes.map((hash) => {
         return {
           token_account_id: parseInt(
-            updatedAccountsMap[accountInfo.tokenAccountAddress]!
+            accountsMap[accountInfo.tokenAccountAddress]!
           ),
           datetime: endDateExclusive,
           transaction_hash: hash!,
@@ -269,7 +276,7 @@ async function _getTokenAccountInfoForMintAndEndDate(
       ...outgoingHashes.map((hash) => {
         return {
           token_account_id: parseInt(
-            updatedAccountsMap[accountInfo.tokenAccountAddress]!
+            accountsMap[accountInfo.tokenAccountAddress]!
           ),
           datetime: endDateExclusive,
           transaction_hash: hash!,
@@ -280,22 +287,26 @@ async function _getTokenAccountInfoForMintAndEndDate(
   });
 
   if (incomingTransactionRows.length > 0) {
-    await knex<TokenAccountTransaction>("token_account_transactions")
-      .insert(
-        incomingTransactionRows,
-        "*" // need this for postgres to return the added result
-      )
-      .onConflict(["token_account_id", "transaction_hash"])
-      .ignore(); // can just ignore if we already have this account saved
+    for (let i = 0; i < incomingTransactionRows.length; i += chunkSize) {
+      await knex<TokenAccountTransaction>("token_account_transactions")
+        .insert(
+          incomingTransactionRows.slice(i, i + chunkSize),
+          "*" // need this for postgres to return the added result
+        )
+        .onConflict(["token_account_id", "transaction_hash"])
+        .ignore(); // can just ignore if we already have this account saved
+    }
   }
 
   if (outgoingTransactionRows.length > 0) {
-    await knex<TokenAccountTransaction>("token_account_transactions")
-      .insert(
-        outgoingTransactionRows,
-        "*" // need this for postgres to return the added result
-      )
-      .onConflict(["token_account_id", "transaction_hash"])
-      .ignore(); // can just ignore if we already have this account saved
+    for (let i = 0; i < incomingTransactionRows.length; i += chunkSize) {
+      await knex<TokenAccountTransaction>("token_account_transactions")
+        .insert(
+          outgoingTransactionRows.slice(i, i + chunkSize),
+          "*" // need this for postgres to return the added result
+        )
+        .onConflict(["token_account_id", "transaction_hash"])
+        .ignore(); // can just ignore if we already have this account saved
+    }
   }
 }
