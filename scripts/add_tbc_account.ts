@@ -18,7 +18,7 @@ import bs58 from "bs58";
     RLYv2ubRMDLcGG2UyvPmnPmkfuQTsMbg4Jtygc7dmnq
 
  * e.g. $ npm run add-tbc-account \
-    nullr \
+    null \
     4Fce62WKxUeBrR7ShrxjC4WL6gcyeTEUyByCdFufBQuC Eh9mq1m2X2MgiZGd2hfMEbAuKZcbdXTo7EqFUcT9EyVS \
     RLYv2ubRMDLcGG2UyvPmnPmkfuQTsMbg4Jtygc7dmnq
  */

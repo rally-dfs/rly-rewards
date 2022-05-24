@@ -6,11 +6,6 @@ import bs58 from "bs58";
 import { TokenAccountBalance } from "./knex-types/token_account_balance";
 import { TokenAccountTransaction } from "./knex-types/token_account_transaction";
 
-// TODO: there's currently no bulk version of this call since it's so large, it must be run one day at a time. It'd
-// be useful to have one similar to tbc_accounts.getAllDailyTokenBalancesSinceLastFetch, we'd need to get max(datetime)
-// across all token_account_transactions to figure out when the last successful run per mint was, and then call
-// getAllTokenAccountInfoAndTransactionsForEndDate in a loop
-
 /** Calls getAllTokenAccountInfoAndTransactions for all token accounts from `previously fetched end date + 24 hours`
  * (inclusive) to `end date` (exclusive).
  * Note that the date is always interpreted as 00:00 UTC for consistency (i.e. you can't pass a specific time,

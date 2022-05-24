@@ -17,7 +17,18 @@ routes.get("/", async (_req, res) => {
 
   const tbcAccountBalances = await knex<TBCAccountBalance>(
     "tbc_account_balances"
-  ).select();
+  )
+    .select()
+    .orderBy("datetime");
+  const tbcAccountBalancesByAccount: { [key: number]: TBCAccountBalance[] } =
+    {};
+  tbcAccountBalances.reduce((accumulator, accountBalance) => {
+    if (accumulator[accountBalance.tbc_account_id] === undefined) {
+      accumulator[accountBalance.tbc_account_id] = [];
+    }
+    accumulator[accountBalance.tbc_account_id]?.push(accountBalance);
+    return accumulator;
+  }, tbcAccountBalancesByAccount);
 
   const tokenAccountMints = (
     await knex<TokenAccountMint>("token_account_mints").select()
@@ -29,12 +40,25 @@ routes.get("/", async (_req, res) => {
     };
   });
 
-  const newTokenAccounts = await knex("token_accounts")
+  // this any[] should probably be replaced by a real type once this API isn't just a placeholder anymore
+  const newTokenAccounts: any[] = await knex("token_accounts")
     .select("mint_id", "first_transaction_date")
     .count("address as count")
-    .groupBy("first_transaction_date", "mint_id");
+    .groupBy("first_transaction_date", "mint_id")
+    .orderBy("first_transaction_date");
+  const newTokenAccountsByMint: { [key: number]: Object[] } = {};
+  newTokenAccounts.reduce((accumulator, tokenAccount) => {
+    if (accumulator[tokenAccount.mint_id] === undefined) {
+      accumulator[tokenAccount.mint_id] = [];
+    }
+    accumulator[tokenAccount.mint_id]?.push(tokenAccount);
+    return accumulator;
+  }, newTokenAccountsByMint);
 
-  const tokenAccountsTransactions = await knex("token_account_transactions")
+  // this any[] should probably be replaced by a real type once this API isn't just a placeholder anymore
+  const tokenAccountsTransactions: any[] = await knex(
+    "token_account_transactions"
+  )
     .join(
       "token_accounts",
       "token_accounts.id",
@@ -42,7 +66,16 @@ routes.get("/", async (_req, res) => {
     )
     .select("token_accounts.mint_id", "datetime", "transfer_in")
     .count("transaction_hash as count")
-    .groupBy("token_accounts.mint_id", "datetime", "transfer_in");
+    .groupBy("token_accounts.mint_id", "datetime", "transfer_in")
+    .orderBy("datetime");
+  const tokenAccountsTransactionsByMint: { [key: number]: Object[] } = {};
+  tokenAccountsTransactions.reduce((accumulator, tokenAccount) => {
+    if (accumulator[tokenAccount.mint_id] === undefined) {
+      accumulator[tokenAccount.mint_id] = [];
+    }
+    accumulator[tokenAccount.mint_id]?.push(tokenAccount);
+    return accumulator;
+  }, tokenAccountsTransactionsByMint);
 
   // calling/processing token account balances one mint at a time since that's probably how it'd be called in
   // real life, but no reason we couldn't do multiple at a time with the same logic if needed
@@ -135,18 +168,11 @@ routes.get("/", async (_req, res) => {
         ).toString(),
       };
     }),
-    tbc_balances: tbcAccountBalances.map((balance) => {
-      return {
-        id: balance.id,
-        account_id: balance.tbc_account_id,
-        date: balance.datetime,
-        balance: balance.balance,
-      };
-    }),
+    tbc_balances_by_account: tbcAccountBalancesByAccount,
     token_account_mints: tokenAccountMints,
-    new_token_accounts: newTokenAccounts,
+    new_token_accounts_by_mint: newTokenAccountsByMint,
     non_zero_balances_by_mint: nonZeroBalancesByMint,
-    token_account_transactions: tokenAccountsTransactions,
+    token_account_transactions_by_mint: tokenAccountsTransactionsByMint,
   });
 });
 
