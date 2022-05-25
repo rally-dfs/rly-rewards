@@ -41,19 +41,19 @@ routes.get("/", async (_req, res) => {
   });
 
   // this any[] should probably be replaced by a real type once this API isn't just a placeholder anymore
-  const newTokenAccounts: any[] = await knex("token_accounts")
+  const newTokenHolderDates: any[] = await knex("token_accounts")
     .select("mint_id", "first_transaction_date")
     .count("address as count")
     .groupBy("first_transaction_date", "mint_id")
     .orderBy("first_transaction_date");
-  const newTokenAccountsByMint: { [key: number]: Object[] } = {};
-  newTokenAccounts.reduce((accumulator, tokenAccount) => {
+  const newTokenHolderDatesByMint: { [key: number]: Object[] } = {};
+  newTokenHolderDates.reduce((accumulator, tokenAccount) => {
     if (accumulator[tokenAccount.mint_id] === undefined) {
       accumulator[tokenAccount.mint_id] = [];
     }
     accumulator[tokenAccount.mint_id]?.push(tokenAccount);
     return accumulator;
-  }, newTokenAccountsByMint);
+  }, newTokenHolderDatesByMint);
 
   // this any[] should probably be replaced by a real type once this API isn't just a placeholder anymore
   const tokenAccountsTransactions: any[] = await knex(
@@ -170,7 +170,7 @@ routes.get("/", async (_req, res) => {
     }),
     tbc_balances_by_account: tbcAccountBalancesByAccount,
     token_account_mints: tokenAccountMints,
-    new_token_accounts_by_mint: newTokenAccountsByMint,
+    new_token_holder_dates_by_mint: newTokenHolderDatesByMint,
     non_zero_balances_by_mint: nonZeroBalancesByMint,
     token_account_transactions_by_mint: tokenAccountsTransactionsByMint,
   });
