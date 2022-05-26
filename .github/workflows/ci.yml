@@ -31,8 +31,5 @@ jobs:
       - name: Install all dependencies (for CI)
         run: npm install
 
-      - name: Compile Typescript
-        run: npm run build
-
       - name: Check code formatting
         run: npx prettier --check .
