@@ -10,11 +10,11 @@ describe("GET /", () => {
     expect(response.body).to.eql({
       message: "RLY Rewards!",
       tbc_accounts: [],
-      tbc_balances: [],
+      tbc_balances_by_account: {},
       token_account_mints: [],
-      new_token_accounts: [],
+      new_token_holder_dates_by_mint: {},
       non_zero_balances_by_mint: {},
-      token_account_transactions: [],
+      token_account_transactions_by_mint: {},
     });
   });
 });
