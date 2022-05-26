@@ -15,7 +15,9 @@
     "add-tbc-account": "ts-node ./scripts/add_tbc_account.ts",
     "get-daily-tbc-balances": "ts-node ./scripts/get_daily_tbc_balances.ts",
     "add-token-account-mint": "ts-node ./scripts/add_token_account_mint.ts",
-    "get-token-accounts-info": "ts-node ./scripts/get_token_accounts_info.ts"
+    "get-token-accounts-info": "ts-node ./scripts/get_token_accounts_info.ts",
+    "add-eth-token-contract": "ts-node ./scripts/add_eth_token_contract.ts",
+    "get-eth-token-address-info": "ts-node ./scripts/get_eth_token_address_info.ts"
   },
   "engines": {
     "node": "16.14.2"
