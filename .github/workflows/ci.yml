@@ -22,7 +22,13 @@ jobs:
         with:
           node-version: 16.14.2
 
-      - name: Install dependencies
+      - name: Install only prod dependencies
+        run: npm install --production
+
+      - name: Try compiling typescript with prod dependencies (matches EB behavior)
+        run: npm run build
+
+      - name: Install all dependencies (for CI)
         run: npm install
 
       - name: Compile Typescript
