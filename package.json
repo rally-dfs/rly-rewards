@@ -6,7 +6,7 @@
   "scripts": {
     "format": "prettier -w .",
     "build": "tsc -p tsconfig.json",
-    "test": "ts-mocha --exit tests/**/*.ts",
+    "test": "ts-mocha tests/**/*.test.ts",
     "dev": "nodemon src/server.ts",
     "prod": "node dist/server.js",
     "prestart": "./node_modules/.bin/knex migrate:latest",
