@@ -9,7 +9,7 @@ export function tokenDatabaseIds(mintedTokens: TokenAccountMint[]) {
 
 export function accountIdsForTokens(mintedTokens: TokenAccountMint[]) {
   return knex
-    .select("token_account_id")
+    .select("id")
     .from("token_accounts")
     .whereIn("mint_id", tokenDatabaseIds(mintedTokens));
 }
