@@ -1,24 +1,19 @@
+import { TrackedToken } from "../knex-types/tracked_token";
 import { getKnex } from "..//database";
-import { TokenAccountMint } from "../knex-types/token_account_mint";
-import { tokenDatabaseIds } from "./utils";
+import { accountIdsForTokens } from "./utils";
 
 const knex = getKnex();
 
 export async function totalWallets(
-  mintedTokens: TokenAccountMint[],
+  mintedTokens: TrackedToken[],
   opts?: { startDate?: Date; removeEmptyWallets?: boolean }
 ) {
   const startDateFilter = opts?.startDate || new Date(0);
 
-  const validAccounts = knex
-    .select("token_account_id")
-    .from("token_accounts")
-    .whereIn("mint_id", tokenDatabaseIds(mintedTokens));
-
-  const result = await knex("token_account_balances")
-    .countDistinct("token_account_id")
+  const result = await knex("tracked_token_account_balances")
+    .countDistinct("tracked_token_account_id")
     .where("datetime", ">=", startDateFilter)
-    .whereIn("token_account_id", validAccounts)
+    .whereIn("tracked_token_account_id", accountIdsForTokens(mintedTokens))
     .modify((query) => {
       if (opts?.removeEmptyWallets) {
         query.where("approximate_minimum_balance", ">", 0);
