@@ -1,16 +1,11 @@
 import { getKnex } from "../src/database";
-import { TokenAccount } from "../src/knex-types/token_account";
-import { TokenAccountMint } from "../src/knex-types/token_account_mint";
+import { TrackedTokenAccount } from "../src/knex-types/tracked_token_account";
+import { TrackedToken } from "../src/knex-types/tracked_token";
 
 const knex = getKnex();
 
-export async function createTrackedToken(
-  displayName: string,
-  address: Uint8Array
-) {
-  const mintedTokens = await knex<TokenAccountMint>(
-    "token_account_mints"
-  ).insert(
+export async function createTrackedToken(displayName: string, address: string) {
+  const mintedTokens = await knex<TrackedToken>("tracked_tokens").insert(
     {
       mint_address: address,
       display_name: displayName,
@@ -26,15 +21,17 @@ export async function createTrackedToken(
 }
 
 export async function createAccount(
-  mintedToken: TokenAccountMint,
+  trackedToken: TrackedToken,
   date: Date
-): Promise<TokenAccount> {
+): Promise<TrackedTokenAccount> {
   const fakeAddressSeed = Math.round(Math.random() * 100);
-  const dbResponse = await knex<TokenAccount>("token_accounts").insert(
+  const dbResponse = await knex<TrackedTokenAccount>(
+    "tracked_token_accounts"
+  ).insert(
     {
-      address: Uint8Array.from([fakeAddressSeed]),
-      owner_address: Uint8Array.from([fakeAddressSeed]),
-      mint_id: mintedToken.id,
+      address: fakeAddressSeed.toString(),
+      owner_address: fakeAddressSeed.toString(),
+      token_id: trackedToken.id,
       first_transaction_date: date,
     },
     "*"

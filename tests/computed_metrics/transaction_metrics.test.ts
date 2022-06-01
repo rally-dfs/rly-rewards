@@ -1,30 +1,30 @@
 import { expect } from "chai";
 import { getKnex } from "../../src/database";
-import { TokenAccountMint } from "../../src/knex-types/token_account_mint";
+import { TrackedToken } from "../../src/knex-types/tracked_token";
 import { createAccount, createTrackedToken } from "../factories";
 import { totalTransactions } from "../../src/computed_metrics/transaction_metrics";
 
 const knex = getKnex();
 
 describe("#totalTransactions", () => {
-  let trackedToken: TokenAccountMint;
+  let trackedToken: TrackedToken;
   beforeEach(async () => {
-    trackedToken = await createTrackedToken("sRLY", Uint8Array.from([1]));
+    trackedToken = await createTrackedToken("sRLY", "fake_address_1");
   });
 
   it("returns the total count of transactions involving the given tracked tokens", async () => {
     const account1 = await createAccount(trackedToken, new Date("2022-05-20"));
     const account2 = await createAccount(trackedToken, new Date("2022-05-21"));
 
-    await knex("token_account_transactions").insert([
+    await knex("tracked_token_account_transactions").insert([
       {
-        token_account_id: account1.id,
+        tracked_token_account_id: account1.id,
         datetime: new Date("2022-05-20"),
         transaction_hash: Uint8Array.from([1]),
         transfer_in: true,
       },
       {
-        token_account_id: account2.id,
+        tracked_token_account_id: account2.id,
         datetime: new Date("2022-05-21"),
         transaction_hash: Uint8Array.from([2]),
         transfer_in: false,
@@ -35,23 +35,20 @@ describe("#totalTransactions", () => {
   });
 
   it("supports combining transaction counts for multiple supplied tokens of interest", async () => {
-    const trackedToken2 = await createTrackedToken(
-      "Taki",
-      Uint8Array.from([2])
-    );
+    const trackedToken2 = await createTrackedToken("Taki", "fake_address_2");
 
     const account1 = await createAccount(trackedToken, new Date("2022-05-20"));
     const account2 = await createAccount(trackedToken2, new Date("2022-05-21"));
 
-    await knex("token_account_transactions").insert([
+    await knex("tracked_token_account_transactions").insert([
       {
-        token_account_id: account1.id,
+        tracked_token_account_id: account1.id,
         datetime: new Date("2022-05-20"),
         transaction_hash: Uint8Array.from([1]),
         transfer_in: true,
       },
       {
-        token_account_id: account2.id,
+        tracked_token_account_id: account2.id,
         datetime: new Date("2022-05-21"),
         transaction_hash: Uint8Array.from([2]),
         transfer_in: false,
@@ -64,23 +61,20 @@ describe("#totalTransactions", () => {
   });
 
   it("ignores transactions for tokens we aren't interested in", async () => {
-    const trackedToken2 = await createTrackedToken(
-      "Taki",
-      Uint8Array.from([2])
-    );
+    const trackedToken2 = await createTrackedToken("Taki", "fake_address_2");
 
     const account1 = await createAccount(trackedToken, new Date("2022-05-20"));
     const account2 = await createAccount(trackedToken2, new Date("2022-05-21"));
 
-    await knex("token_account_transactions").insert([
+    await knex("tracked_token_account_transactions").insert([
       {
-        token_account_id: account1.id,
+        tracked_token_account_id: account1.id,
         datetime: new Date("2022-05-20"),
         transaction_hash: Uint8Array.from([1]),
         transfer_in: true,
       },
       {
-        token_account_id: account2.id,
+        tracked_token_account_id: account2.id,
         datetime: new Date("2022-05-21"),
         transaction_hash: Uint8Array.from([2]),
         transfer_in: false,
@@ -94,15 +88,15 @@ describe("#totalTransactions", () => {
     const account1 = await createAccount(trackedToken, new Date("2022-05-20"));
     const account2 = await createAccount(trackedToken, new Date("2022-05-21"));
 
-    await knex("token_account_transactions").insert([
+    await knex("tracked_token_account_transactions").insert([
       {
-        token_account_id: account1.id,
+        tracked_token_account_id: account1.id,
         datetime: new Date("2022-05-20"),
         transaction_hash: Uint8Array.from([1]),
         transfer_in: true,
       },
       {
-        token_account_id: account2.id,
+        tracked_token_account_id: account2.id,
         datetime: new Date("2022-05-21"),
         transaction_hash: Uint8Array.from([2]),
         transfer_in: false,
