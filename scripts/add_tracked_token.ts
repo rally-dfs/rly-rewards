@@ -1,5 +1,4 @@
 import { getKnex, closeKnexConnection } from "../src/database";
-import { PublicKey } from "@solana/web3.js";
 import { TrackedToken } from "../src/knex-types/tracked_token";
 
 /** Inserts new row to tracked_tokens
@@ -25,7 +24,7 @@ const main = async () => {
 
   const result = await knex<TrackedToken>("tracked_tokens").insert(
     {
-      mint_address: new PublicKey(mintAddressString!).toBytes(),
+      mint_address: mintAddressString,
       display_name: displayNameString,
       decimals: parseInt(decimalsString!),
     },

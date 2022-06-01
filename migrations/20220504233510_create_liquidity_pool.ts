@@ -3,10 +3,10 @@ import { Knex } from "knex";
 export async function up(knex: Knex): Promise<void> {
   return knex.schema.createTable("liquidity_pools", function (table) {
     table.increments();
-    table.binary("init_transaction_hash", 64).unique();
+    table.string("init_transaction_hash").unique();
 
-    table.binary("collateral_token_account", 32).notNullable().unique();
-    table.binary("collateral_token_account_owner", 32).notNullable();
+    table.string("collateral_token_account").notNullable().unique();
+    table.string("collateral_token_account_owner").notNullable();
     table.integer("collateral_token_id").unsigned().notNullable();
     table
       .foreign("collateral_token_id")

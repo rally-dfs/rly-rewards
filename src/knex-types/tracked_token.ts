@@ -4,7 +4,7 @@
 // (and seems cleaner to have this be a separate table than as a series of rows in TBCAccounts)
 export interface TrackedToken {
   id?: number;
-  mint_address: Uint8Array;
+  mint_address: string;
   display_name: string;
   decimals: number;
 }

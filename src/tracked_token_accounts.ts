@@ -1,8 +1,6 @@
 import { getKnex } from "./database";
-import { PublicKey } from "@solana/web3.js";
 import { getAllTrackedTokenAccountInfoAndTransactions } from "./chain-data-utils/combined_queries";
 import { TrackedTokenAccount } from "./knex-types/tracked_token_account";
-import bs58 from "bs58";
 import { TrackedTokenAccountBalance } from "./knex-types/tracked_token_account_balance";
 import { TrackedTokenAccountTransaction } from "./knex-types/tracked_token_account_transaction";
 
@@ -26,10 +24,10 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
   // `WITH values_subtable ... INSERT INTO tracked_token_account_balances SELECT ... FROM tracked_token_accounts JOIN values_subtable`
   const allTrackedTokenAccounts: {
     token_id: number;
-    mint_address: Uint8Array;
+    mint_address: string;
     decimals: number;
     account_id: number;
-    account_address: Uint8Array;
+    account_address: string;
   }[] = await knex("tracked_tokens")
     .leftJoin(
       "tracked_token_accounts",
@@ -56,7 +54,7 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
   allTrackedTokenAccounts.forEach((account) => {
     if (tokenAccountsByMint[account.token_id] === undefined) {
       tokenAccountsByMint[account.token_id] = {
-        mint_address: new PublicKey(account.mint_address).toString(),
+        mint_address: account.mint_address,
         decimals: account.decimals,
         accounts: {},
       };
@@ -64,9 +62,8 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
 
     // if the mint has 0 accounts, then this row will have a `null` account
     if (account.account_id) {
-      tokenAccountsByMint[account.token_id]!.accounts[
-        new PublicKey(account.account_address).toString()
-      ] = account.account_id.toString();
+      tokenAccountsByMint[account.token_id]!.accounts[account.account_address] =
+        account.account_id.toString();
     }
   });
 
@@ -165,10 +162,8 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
   // first insert all the TrackedTokenAccounts
   const tokenAccounts = accountInfos.map((accountInfo) => {
     return {
-      address: new PublicKey(accountInfo.tokenAccountAddress).toBytes(),
-      owner_address: accountInfo.ownerAccountAddress
-        ? new PublicKey(accountInfo.ownerAccountAddress).toBytes()
-        : undefined,
+      address: accountInfo.tokenAccountAddress,
+      owner_address: accountInfo.ownerAccountAddress,
       token_id: parseInt(mintId),
       first_transaction_date: endDateExclusive,
     };
@@ -195,8 +190,7 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
     // update accountsMap with the newly added items (tokenAccountResults doesn't include the already existing
     // rows that weren't inserted)
     tokenAccountsResults.reduce((accountsMap, result) => {
-      accountsMap[new PublicKey(result.address).toString()] =
-        result.id!.toString();
+      accountsMap[result.address] = result.id!.toString();
       return accountsMap;
     }, accountsMap);
   }
@@ -249,23 +243,8 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
   const outgoingTransactionRows: TrackedTokenAccountTransaction[] = [];
 
   filteredAccountInfos.forEach((accountInfo) => {
-    // convert string => Uint8Array
-    const incomingHashes = [...accountInfo.incomingTransactions]
-      .map((transaction) => {
-        const transactionHash = bs58.decode(transaction);
-        return transactionHash.length === 64 ? transactionHash : undefined;
-      })
-      .filter((hash) => hash !== undefined);
-
-    const outgoingHashes = [...accountInfo.outgoingTransactions]
-      .map((transaction) => {
-        const transactionHash = bs58.decode(transaction);
-        return transactionHash.length === 64 ? transactionHash : undefined;
-      })
-      .filter((hash) => hash !== undefined);
-
     incomingTransactionRows.push(
-      ...incomingHashes.map((hash) => {
+      ...[...accountInfo.incomingTransactions].map((hash) => {
         return {
           tracked_token_account_id: parseInt(
             accountsMap[accountInfo.tokenAccountAddress]!
@@ -278,7 +257,7 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
     );
 
     outgoingTransactionRows.push(
-      ...outgoingHashes.map((hash) => {
+      ...[...accountInfo.outgoingTransactions].map((hash) => {
         return {
           tracked_token_account_id: parseInt(
             accountsMap[accountInfo.tokenAccountAddress]!

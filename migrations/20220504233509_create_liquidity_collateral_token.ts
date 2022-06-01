@@ -5,7 +5,7 @@ export async function up(knex: Knex): Promise<void> {
     "liquidity_collateral_tokens",
     function (table) {
       table.increments();
-      table.binary("mint_address", 32).notNullable().unique();
+      table.string("mint_address").notNullable().unique();
       table.smallint("decimals").notNullable();
     }
   );

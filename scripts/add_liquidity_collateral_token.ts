@@ -1,5 +1,4 @@
 import { getKnex, closeKnexConnection } from "../src/database";
-import { PublicKey } from "@solana/web3.js";
 import { LiquidityCollateralToken } from "../src/knex-types/liquidity_collateral_token";
 
 /** Inserts new row to liquidity_collateral_token
@@ -27,7 +26,7 @@ const main = async () => {
     "liquidity_collateral_tokens"
   ).insert(
     {
-      mint_address: new PublicKey(mintAddressString!).toBytes(),
+      mint_address: mintAddressString,
       display_name: displayNameString,
       decimals: parseInt(decimalsString!),
     },

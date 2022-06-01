@@ -3,7 +3,7 @@ import { Knex } from "knex";
 export async function up(knex: Knex): Promise<void> {
   return knex.schema.createTable("tracked_tokens", function (table) {
     table.increments();
-    table.binary("mint_address", 32).notNullable().unique();
+    table.string("mint_address").notNullable().unique();
     table.smallint("decimals").notNullable();
   });
 }

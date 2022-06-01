@@ -2,6 +2,6 @@ export interface TrackedTokenAccountTransaction {
   id?: number;
   tracked_token_account_id: number;
   datetime: Date;
-  transaction_hash: Uint8Array;
+  transaction_hash: string;
   transfer_in: boolean;
 }

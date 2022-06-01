@@ -1,8 +1,6 @@
 import { getKnex, closeKnexConnection } from "../src/database";
-import { PublicKey } from "@solana/web3.js";
 import { LiquidityPool } from "../src/knex-types/liquidity_pool";
 import { LiquidityCollateralToken } from "../src/knex-types/liquidity_collateral_token";
-import bs58 from "bs58";
 
 /** Inserts new row to liquidity_pools
  *
@@ -10,7 +8,7 @@ import bs58 from "bs58";
  * random token account to track and not part of a TBC, e.g. a liquidity pool)
  * arg 2 is collateral_token_account: pubkey of the collateral_token_account
  * arg 3 is collateral_token_account_owner: pubkey of the owner of collateral_token_account
- * arg 4 is token_a_mint_address: mint address of token A (usually sRLY)
+ * arg 4 is collateral_token_address: mint address of token A (usually sRLY)
  *
  * e.g. $ npm run add-liquidity-pool \
     66tnH1qyBeNMWsGf5ZZUijK14RbzQ9JJ8ZUP15ayrGXMTAQnYPe4S7jhBZ1joHRpBib2khjweTiTXJUs1NfVuGqr \
@@ -26,47 +24,27 @@ const main = async () => {
   const knex = getKnex();
 
   const initTransactionHashString = process.argv[2];
-  const tokenAAccountAddressString = process.argv[3];
-  const tokenAAccountOwnerAddressString = process.argv[4];
-  const tokenAMintAddressString = process.argv[5];
-
-  // validate keys and convert to byte array to store in DB
-
-  let initTransactionHash: Uint8Array | undefined;
-  if (initTransactionHashString === "null") {
-    initTransactionHash = undefined;
-  } else {
-    initTransactionHash = bs58.decode(initTransactionHashString!);
-    if (initTransactionHash.length != 64) {
-      throw new Error(`Invalid transaction hash`);
-    }
-  }
-
-  const tokenAAccountAddress = new PublicKey(
-    tokenAAccountAddressString!
-  ).toBytes();
-  const tokenAAccountOwnerAddress = new PublicKey(
-    tokenAAccountOwnerAddressString!
-  ).toBytes();
-  const tokenAMintAddress = new PublicKey(tokenAMintAddressString!).toBytes();
+  const collateralTokenAccountAddressString = process.argv[3];
+  const collateralTokenAccountOwnerAddressString = process.argv[4];
+  const collateralTokenMintAddressString = process.argv[5];
 
   console.log(
-    `Adding liquidity pool ${initTransactionHashString}: ${tokenAAccountAddressString}, ` +
-      `${tokenAAccountOwnerAddressString}, ${tokenAMintAddressString}`
+    `Adding liquidity pool ${initTransactionHashString}: ${collateralTokenAccountAddressString}, ` +
+      `${collateralTokenAccountOwnerAddressString}, ${collateralTokenMintAddressString}`
   );
 
-  const tokenAMintRow = await knex<LiquidityCollateralToken>(
+  const collateralTokenMintRow = await knex<LiquidityCollateralToken>(
     "liquidity_collateral_tokens"
   )
     .select()
-    .where({ mint_address: tokenAMintAddress });
+    .where({ mint_address: collateralTokenMintAddressString });
 
   const result = await knex<LiquidityPool>("liquidity_pools").insert(
     {
-      init_transaction_hash: initTransactionHash,
-      collateral_token_account: tokenAAccountAddress,
-      collateral_token_account_owner: tokenAAccountOwnerAddress,
-      collateral_token_id: tokenAMintRow[0]!.id,
+      init_transaction_hash: initTransactionHashString,
+      collateral_token_account: collateralTokenAccountAddressString,
+      collateral_token_account_owner: collateralTokenAccountOwnerAddressString,
+      collateral_token_id: collateralTokenMintRow[0]!.id,
     },
     "*" // need this for postgres to return the added result
   );

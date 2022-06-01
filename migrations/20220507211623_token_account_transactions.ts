@@ -10,7 +10,7 @@ export async function up(knex: Knex): Promise<void> {
         .foreign("tracked_token_account_id")
         .references("tracked_token_accounts.id");
       table.datetime("datetime").notNullable();
-      table.binary("transaction_hash", 64).notNullable();
+      table.string("transaction_hash").notNullable();
       table.boolean("transfer_in").notNullable();
 
       // a transaction will have one row for incoming and one row for outgoing (with different tracked_token_account_ids),
