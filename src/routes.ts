@@ -1,10 +1,10 @@
 import { PublicKey } from "@solana/web3.js";
 import { Router } from "express";
 import { getKnex } from "./database";
-import { TBCAccount } from "./knex-types/tbc_account";
-import { TBCAccountBalance } from "./knex-types/tbc_account_balance";
-import { TokenAccountBalance } from "./knex-types/token_account_balance";
-import { TokenAccountMint } from "./knex-types/token_account_mint";
+import { LiquidityPool } from "./knex-types/liquidity_pool";
+import { LiquidityPoolBalance } from "./knex-types/liquidity_pool_balance";
+import { TrackedTokenAccountBalance } from "./knex-types/tracked_token_account_balance";
+import { TrackedToken } from "./knex-types/tracked_token";
 
 const routes = Router();
 
@@ -13,25 +13,26 @@ const knex = getKnex();
 routes.get("/", async (_req, res) => {
   // this is all just a placeholder to show the data, we would probably split these into dedicated
   // APIs based on the frontend UI (plus the return formats are all inconsistent right now)
-  const accounts = await knex<TBCAccount>("tbc_accounts").select();
+  const accounts = await knex<LiquidityPool>("liquidity_pools").select();
 
-  const tbcAccountBalances = await knex<TBCAccountBalance>(
-    "tbc_account_balances"
+  const liquidityPoolBalances = await knex<LiquidityPoolBalance>(
+    "liquidity_pool_balances"
   )
     .select()
     .orderBy("datetime");
-  const tbcAccountBalancesByAccount: { [key: number]: TBCAccountBalance[] } =
-    {};
-  tbcAccountBalances.reduce((accumulator, accountBalance) => {
-    if (accumulator[accountBalance.tbc_account_id] === undefined) {
-      accumulator[accountBalance.tbc_account_id] = [];
+  const liquidityPoolBalancesByAccount: {
+    [key: number]: LiquidityPoolBalance[];
+  } = {};
+  liquidityPoolBalances.reduce((accumulator, accountBalance) => {
+    if (accumulator[accountBalance.liquidity_pool_id] === undefined) {
+      accumulator[accountBalance.liquidity_pool_id] = [];
     }
-    accumulator[accountBalance.tbc_account_id]?.push(accountBalance);
+    accumulator[accountBalance.liquidity_pool_id]?.push(accountBalance);
     return accumulator;
-  }, tbcAccountBalancesByAccount);
+  }, liquidityPoolBalancesByAccount);
 
   const tokenAccountMints = (
-    await knex<TokenAccountMint>("token_account_mints").select()
+    await knex<TrackedToken>("tracked_tokens").select()
   ).map((mint) => {
     return {
       id: mint.id,
@@ -41,39 +42,39 @@ routes.get("/", async (_req, res) => {
   });
 
   // this any[] should probably be replaced by a real type once this API isn't just a placeholder anymore
-  const newTokenHolderDates: any[] = await knex("token_accounts")
-    .select("mint_id", "first_transaction_date")
+  const newTokenHolderDates: any[] = await knex("tracked_token_accounts")
+    .select("token_id", "first_transaction_date")
     .count("address as count")
-    .groupBy("first_transaction_date", "mint_id")
+    .groupBy("first_transaction_date", "token_id")
     .orderBy("first_transaction_date");
   const newTokenHolderDatesByMint: { [key: number]: Object[] } = {};
   newTokenHolderDates.reduce((accumulator, tokenAccount) => {
-    if (accumulator[tokenAccount.mint_id] === undefined) {
-      accumulator[tokenAccount.mint_id] = [];
+    if (accumulator[tokenAccount.token_id] === undefined) {
+      accumulator[tokenAccount.token_id] = [];
     }
-    accumulator[tokenAccount.mint_id]?.push(tokenAccount);
+    accumulator[tokenAccount.token_id]?.push(tokenAccount);
     return accumulator;
   }, newTokenHolderDatesByMint);
 
   // this any[] should probably be replaced by a real type once this API isn't just a placeholder anymore
   const tokenAccountsTransactions: any[] = await knex(
-    "token_account_transactions"
+    "tracked_token_account_transactions"
   )
     .join(
-      "token_accounts",
-      "token_accounts.id",
-      "token_account_transactions.token_account_id"
+      "tracked_token_accounts",
+      "tracked_token_accounts.id",
+      "tracked_token_account_transactions.tracked_token_account_id"
     )
-    .select("token_accounts.mint_id", "datetime", "transfer_in")
+    .select("tracked_token_accounts.token_id", "datetime", "transfer_in")
     .count("transaction_hash as count")
-    .groupBy("token_accounts.mint_id", "datetime", "transfer_in")
+    .groupBy("tracked_token_accounts.token_id", "datetime", "transfer_in")
     .orderBy("datetime");
   const tokenAccountsTransactionsByMint: { [key: number]: Object[] } = {};
   tokenAccountsTransactions.reduce((accumulator, tokenAccount) => {
-    if (accumulator[tokenAccount.mint_id] === undefined) {
-      accumulator[tokenAccount.mint_id] = [];
+    if (accumulator[tokenAccount.token_id] === undefined) {
+      accumulator[tokenAccount.token_id] = [];
     }
-    accumulator[tokenAccount.mint_id]?.push(tokenAccount);
+    accumulator[tokenAccount.token_id]?.push(tokenAccount);
     return accumulator;
   }, tokenAccountsTransactionsByMint);
 
@@ -81,24 +82,28 @@ routes.get("/", async (_req, res) => {
   // real life, but no reason we couldn't do multiple at a time with the same logic if needed
   const nonZeroBalancesByMintEntries = await Promise.all(
     tokenAccountMints.map(async (mint) => {
-      // this read could be more efficient/require less processing - see note in token_accounts.ts about
-      // inserting/caching TokenAccountBalances
-      const tokenAccountBalances: TokenAccountBalance[] =
-        await knex<TokenAccountBalance>("token_account_balances")
-          .select("token_account_id", "datetime", "approximate_minimum_balance")
-          .join(
-            "token_accounts",
-            "token_accounts.id",
-            "token_account_balances.token_account_id"
+      // this read could be more efficient/require less processing - see note in tracked_token_accounts.ts about
+      // inserting/caching TrackedTokenAccountBalances
+      const tokenAccountBalances: TrackedTokenAccountBalance[] =
+        await knex<TrackedTokenAccountBalance>("tracked_token_account_balances")
+          .select(
+            "tracked_token_account_id",
+            "datetime",
+            "approximate_minimum_balance"
           )
-          .where("token_accounts.mint_id", "=", mint.id!)
+          .join(
+            "tracked_token_accounts",
+            "tracked_token_accounts.id",
+            "tracked_token_account_balances.tracked_token_account_id"
+          )
+          .where("tracked_token_accounts.token_id", "=", mint.id!)
           .orderBy("datetime");
 
       if (tokenAccountBalances.length == 0) {
         return [mint.id, {}];
       }
 
-      // {datetime (as iso string): {token_account_id: balance}}
+      // {datetime (as iso string): {tracked_token_account_id: balance}}
       const balancesByDate: {
         [key: string]: { [key: string]: number };
       } = {};
@@ -106,7 +111,7 @@ routes.get("/", async (_req, res) => {
       let currentDate = tokenAccountBalances[0]!.datetime;
       let i = 0;
 
-      // this processing logic assumes the token_account_balances are sorted by date
+      // this processing logic assumes the tracked_token_account_balances are sorted by date
       while (i < tokenAccountBalances.length && currentDate < new Date()) {
         // deep copy the array from previousDate's balances
         balancesByDate[currentDate.toISOString()] =
@@ -124,12 +129,13 @@ routes.get("/", async (_req, res) => {
         ) {
           const account = tokenAccountBalances[i]!;
 
-          balancesByDate[currentDate.toISOString()]![account.token_account_id] =
-            account.approximate_minimum_balance;
+          balancesByDate[currentDate.toISOString()]![
+            account.tracked_token_account_id
+          ] = account.approximate_minimum_balance;
           i++;
         }
 
-        // make sure to step one day at a time so that we copy over the balances even on days with 0 TokenAccountBalances
+        // make sure to step one day at a time so that we copy over the balances even on days with 0 TrackedTokenAccountBalances
         previousDate = currentDate;
         currentDate = new Date(currentDate.valueOf() + 24 * 3600 * 1000);
       }
@@ -160,19 +166,19 @@ routes.get("/", async (_req, res) => {
 
   return res.json({
     message: "RLY Rewards!",
-    tbc_accounts: accounts.map((account) => {
+    liquidity_pools: accounts.map((account) => {
       return {
         id: account.id,
-        token_a_account_address: new PublicKey(
-          account.token_a_account_address
+        collateral_token_account: new PublicKey(
+          account.collateral_token_account
         ).toString(),
       };
     }),
-    tbc_balances_by_account: tbcAccountBalancesByAccount,
-    token_account_mints: tokenAccountMints,
+    liquidity_balances_by_account: liquidityPoolBalancesByAccount,
+    tracked_tokens: tokenAccountMints,
     new_token_holder_dates_by_mint: newTokenHolderDatesByMint,
     non_zero_balances_by_mint: nonZeroBalancesByMint,
-    token_account_transactions_by_mint: tokenAccountsTransactionsByMint,
+    tracked_token_account_transactions_by_mint: tokenAccountsTransactionsByMint,
   });
 });
 

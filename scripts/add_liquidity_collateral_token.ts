@@ -1,14 +1,13 @@
 import { getKnex, closeKnexConnection } from "../src/database";
-import { PublicKey } from "@solana/web3.js";
-import { TBCTokenMint } from "../src/knex-types/tbc_token_mint";
+import { LiquidityCollateralToken } from "../src/knex-types/liquidity_collateral_token";
 
-/** Inserts new row to tbc_token_mints
+/** Inserts new row to liquidity_collateral_token
  *
  * arg 1 is mint_address
  * arg 2 is display_name
  * arg 3 is decimals
  *
- * e.g. $ npm run add-tbc-token-mint RLYv2ubRMDLcGG2UyvPmnPmkfuQTsMbg4Jtygc7dmnq sRLY 9
+ * e.g. $ npm run add-liquidity-collateral-token RLYv2ubRMDLcGG2UyvPmnPmkfuQTsMbg4Jtygc7dmnq sRLY 9
  */
 const main = async () => {
   const knex = getKnex();
@@ -23,9 +22,11 @@ const main = async () => {
     `Adding token mint ${displayNameString} ${mintAddressString}, decimals: ${decimalsString}`
   );
 
-  const result = await knex<TBCTokenMint>("tbc_token_mints").insert(
+  const result = await knex<LiquidityCollateralToken>(
+    "liquidity_collateral_tokens"
+  ).insert(
     {
-      mint_address: new PublicKey(mintAddressString!).toBytes(),
+      mint_address: mintAddressString,
       display_name: displayNameString,
       decimals: parseInt(decimalsString!),
     },

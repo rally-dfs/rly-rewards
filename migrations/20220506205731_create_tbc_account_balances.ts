@@ -1,20 +1,20 @@
 import { Knex } from "knex";
 
 export async function up(knex: Knex): Promise<void> {
-  return knex.schema.createTable("tbc_account_balances", function (table) {
+  return knex.schema.createTable("liquidity_pool_balances", function (table) {
     table.increments();
-    table.integer("tbc_account_id").unsigned().notNullable();
-    table.foreign("tbc_account_id").references("tbc_accounts.id");
+    table.integer("liquidity_pool_id").unsigned().notNullable();
+    table.foreign("liquidity_pool_id").references("liquidity_pools.id");
     table.datetime("datetime").notNullable();
     table.bigInteger("balance").unsigned().notNullable();
 
-    table.unique(["tbc_account_id", "datetime"]);
+    table.unique(["liquidity_pool_id", "datetime"]);
   });
 }
 
 export async function down(knex: Knex): Promise<void> {
   if (process.env.NODE_ENV === "development") {
-    return knex.schema.dropTable("tbc_account_balances");
+    return knex.schema.dropTable("liquidity_pool_balances");
   } else {
     console.log(
       `env (${process.env.NODE_ENV}) is not set to development, refusing to drop table`

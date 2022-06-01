@@ -6,7 +6,7 @@ import {
 } from "./solana_fm";
 import {
   allSolanaTransfersBetweenDatesBitquery,
-  solanaTokenAccountsInfoBetweenDatesBitquery,
+  solanaTrackedTokenAccountsInfoBetweenDatesBitquery,
 } from "./bitquery";
 
 const SOL_NETWORK = "mainnet-beta";
@@ -186,16 +186,16 @@ export async function getDailyTokenBalancesBetweenDates(
   return allBalances;
 }
 
-export type TokenAccountInfo = {
+export type TrackedTokenAccountInfo = {
   tokenAccountAddress: string;
   ownerAccountAddress?: string;
-  // see note in TokenAccountBalance.approximate_minimum_balance on this
+  // see note in TrackedTokenAccountBalance.approximate_minimum_balance on this
   approximateMinimumBalance?: number;
   incomingTransactions: Set<string>;
   outgoingTransactions: Set<string>;
 };
 
-/** Calls both bitquery and solana.fm versions of getAllTokenAccountInfo for tokenMintAddress from
+/** Calls both bitquery and solana.fm versions of getAllTrackedTokenAccountInfo for tokenMintAddress from
  * start date (inclusive) to end date (exclusive). Returns the transactions from bitquery and the balance at
  * endDate from solana.fm
  *
@@ -203,12 +203,12 @@ export type TokenAccountInfo = {
  * @param startDateInclusive
  * @param endDateExclusive
  */
-export async function getAllTokenAccountInfoAndTransactions(
+export async function getAllTrackedTokenAccountInfoAndTransactions(
   tokenMintAddress: string,
   tokenMintDecimals: number,
   startDateInclusive: Date,
   endDateExclusive: Date
-): Promise<TokenAccountInfo[]> {
+): Promise<TrackedTokenAccountInfo[]> {
   // solana.fm token accounts info
   let tokenAccountsInfoSFMMap = await tokenAccountsInfoBetweenDatesSolanaFm(
     tokenMintAddress,
@@ -223,7 +223,7 @@ export async function getAllTokenAccountInfoAndTransactions(
   // bitquery token accounts info
   // note this returns delta(balance) from startDate instead of actual balance (not used for now)
   let tokenAccountsInfoBQMap =
-    await solanaTokenAccountsInfoBetweenDatesBitquery(
+    await solanaTrackedTokenAccountsInfoBetweenDatesBitquery(
       tokenMintAddress,
       startDateInclusive,
       endDateExclusive

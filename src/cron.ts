@@ -1,7 +1,7 @@
 import cron from "node-cron";
 
-import { getAllDailyTokenBalancesSinceLastFetch } from "./tbc_accounts";
-import { getAllTokenAccountInfoAndTransactionsForEndDate } from "./token_accounts";
+import { getAllDailyTokenBalancesSinceLastFetch } from "./liquidity_pools";
+import { getAllTrackedTokenAccountInfoAndTransactionsForEndDate } from "./tracked_token_accounts";
 
 export function initCron() {
   cron.schedule("0 0 * * *", async () => {
@@ -12,7 +12,7 @@ export function initCron() {
     await getAllDailyTokenBalancesSinceLastFetch(
       latestEndDate.toISOString().substring(0, 10)
     );
-    await getAllTokenAccountInfoAndTransactionsForEndDate(
+    await getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
       latestEndDate.toISOString().substring(0, 10),
       false
     );
