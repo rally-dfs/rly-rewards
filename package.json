@@ -14,8 +14,8 @@
     "add-liquidity-collateral-token": "ts-node ./scripts/add_liquidity_collateral_token.ts",
     "add-liquidity-pool": "ts-node ./scripts/add_liquidity_pool.ts",
     "get-daily-liquidity-balances": "ts-node ./scripts/get_daily_liquidity_balances.ts",
-    "add-token-account-mint": "ts-node ./scripts/add_token_account_mint.ts",
-    "get-token-accounts-info": "ts-node ./scripts/get_token_accounts_info.ts"
+    "add-tracked-token": "ts-node ./scripts/add_tracked_token.ts",
+    "get-tracked-token-accounts-info": "ts-node ./scripts/get_tracked_token_accounts_info.ts"
   },
   "engines": {
     "node": "16.14.2"

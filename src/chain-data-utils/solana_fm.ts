@@ -168,7 +168,7 @@ export async function latestAccountInputsOnDateSolanaFm(
   }
 }
 
-export type SolanaFMTokenAccountInfo = {
+export type SolanaFMTrackedTokenAccountInfo = {
   tokenAccountAddress: string;
   balance: number;
   incomingTransactions: Set<string>;
@@ -180,7 +180,7 @@ export type SolanaFMTokenAccountInfo = {
 
 // Queries solana.fm account-inputs for all token accounts belonging to `tokenMintAddress` with any activity between
 // `startDateInclusive` and `endDateExclusive`
-// Returns a map of {tokenAccountAddress => SolanaFMTokenAccountInfo} (i.e. this would probably be used to see which new
+// Returns a map of {tokenAccountAddress => SolanaFMTrackedTokenAccountInfo} (i.e. this would probably be used to see which new
 // accounts were created that day and for updating balance/txn count for any previous accounts against some running
 // db list)
 // https://docs.solana.fm/docs/apis/account-input#retrieve-account-inputs-by-a-specific-token
@@ -220,7 +220,7 @@ export async function tokenAccountsInfoBetweenDatesSolanaFm(
     return undefined;
   }
 
-  let accountInfoMap: { [key: string]: SolanaFMTokenAccountInfo } = {};
+  let accountInfoMap: { [key: string]: SolanaFMTrackedTokenAccountInfo } = {};
 
   // sort by date so that we can safely update `balance` to the latest one every time
   results

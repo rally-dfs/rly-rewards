@@ -208,7 +208,7 @@ export async function allSolanaTransfersBetweenDatesBitquery(
   return filteredTransfersOut.concat(filteredTransfersIn);
 }
 
-export type BitquerySolanaTokenAccountInfo = {
+export type BitquerySolanaTrackedTokenAccountInfo = {
   tokenAccountAddress: string;
   ownerAccountAddress?: string;
   balanceChange: number;
@@ -218,7 +218,7 @@ export type BitquerySolanaTokenAccountInfo = {
 
 // Queries bitquery solana.transfers for all token accounts belonging to `tokenMintAddress` with any activity between
 // `startDate` and `endDate`
-// Returns a map of {tokenAccountAddress => BitquerySolanaTokenAccountInfo} (i.e. this would probably be used to see which
+// Returns a map of {tokenAccountAddress => BitquerySolanaTrackedTokenAccountInfo} (i.e. this would probably be used to see which
 // new accounts were created that day and for updating balance/txn count for any previous accounts against some running
 // db list)
 //
@@ -228,7 +228,7 @@ export type BitquerySolanaTokenAccountInfo = {
 // Note this interface is slightly different than tokenAccountsInfoBetweenDatesSolanaFm. Since bitquery
 // solana.transfers doesn't have any balances, we return the change in balance between startDate and endDate rather
 // than the final balance (so this must be combined with some previous call's balance or called multiple times)
-export async function solanaTokenAccountsInfoBetweenDatesBitquery(
+export async function solanaTrackedTokenAccountsInfoBetweenDatesBitquery(
   tokenMintAddress: string,
   startDateInclusive: Date,
   endDateExclusive: Date
@@ -241,7 +241,8 @@ export async function solanaTokenAccountsInfoBetweenDatesBitquery(
     undefined
   );
 
-  let accountInfoMap: { [key: string]: BitquerySolanaTokenAccountInfo } = {};
+  let accountInfoMap: { [key: string]: BitquerySolanaTrackedTokenAccountInfo } =
+    {};
 
   results.forEach((result) => {
     // TODO: currently ignoring "mint" "burn" and "self" (think this is when the same owner transfers

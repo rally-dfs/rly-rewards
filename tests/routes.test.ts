@@ -11,10 +11,10 @@ describe("GET /", () => {
       message: "RLY Rewards!",
       liquidity_pools: [],
       liquidity_balances_by_account: {},
-      token_account_mints: [],
+      tracked_tokens: [],
       new_token_holder_dates_by_mint: {},
       non_zero_balances_by_mint: {},
-      token_account_transactions_by_mint: {},
+      tracked_token_account_transactions_by_mint: {},
     });
   });
 });
