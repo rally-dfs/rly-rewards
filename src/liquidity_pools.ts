@@ -1,7 +1,7 @@
 import { getKnex } from "./database";
 import { PublicKey } from "@solana/web3.js";
 import { getDailyTokenBalancesBetweenDates } from "./chain-data-utils/combined_queries";
-import { TBCAccountBalance } from "./knex-types/tbc_account_balance";
+import { LiquidityPoolBalance } from "./knex-types/liquidity_pool_balance";
 
 /** Calls getDailyTokenBalancesBetweenDates for all token accounts, starting from the last date whose balance we have */
 export async function getAllDailyTokenBalancesSinceLastFetch(
@@ -10,11 +10,11 @@ export async function getAllDailyTokenBalancesSinceLastFetch(
   const knex = getKnex();
 
   // get the max(datetime) grouped by token accounts
-  const accountLatestDates: { tbc_account_id: number; latest_date: Date }[] =
-    await knex("tbc_account_balances")
-      .select("tbc_account_id")
+  const accountLatestDates: { liquidity_pool_id: number; latest_date: Date }[] =
+    await knex("liquidity_pool_balances")
+      .select("liquidity_pool_id")
       .max("datetime as latest_date")
-      .groupBy("tbc_account_id");
+      .groupBy("liquidity_pool_id");
 
   console.log("dates", accountLatestDates);
 
@@ -33,7 +33,7 @@ export async function getAllDailyTokenBalancesSinceLastFetch(
     await getDailyTokenBalances(
       earliestEndDate.toISOString().substring(0, 10),
       latestEndDateString,
-      [accountLatestDate.tbc_account_id]
+      [accountLatestDate.liquidity_pool_id]
     );
   }
 }
@@ -43,12 +43,12 @@ export async function getAllDailyTokenBalancesSinceLastFetch(
  *
  * @argument earliestEndDateString earliest endDate to fetch (inclusive), as a string. e.g. "2022-04-01"
  * @argument latestEndDateString latest endDate to fetch (inclusive), as a string, e.g. "2022-05-01"
- * @argument tbcAccountIds ids of TBCAccounts to fetch. Fetches all accounts if undefined
+ * @argument liquidityPoolIds ids of TBCAccounts to fetch. Fetches all accounts if undefined
  */
 export async function getDailyTokenBalances(
   earliestEndDateString: string,
   latestEndDateString: string,
-  tbcAccountIds?: number[]
+  liquidityPoolIds?: number[]
 ) {
   const knex = getKnex();
 
@@ -62,28 +62,28 @@ export async function getDailyTokenBalances(
     return;
   }
 
-  let query = knex("tbc_accounts")
+  let query = knex("liquidity_pools")
     .join(
-      "tbc_token_mints",
-      "tbc_accounts.token_a_mint_id",
-      "tbc_token_mints.id"
+      "liquidity_collateral_tokens",
+      "liquidity_pools.collateral_token_id",
+      "liquidity_collateral_tokens.id"
     )
     .select(
-      "tbc_accounts.id as tbc_account_id",
-      "tbc_accounts.token_a_account_address",
-      "tbc_accounts.token_a_account_owner_address",
-      "tbc_token_mints.mint_address",
-      "tbc_token_mints.decimals"
+      "liquidity_pools.id as liquidity_pool_id",
+      "liquidity_pools.collateral_token_account",
+      "liquidity_pools.collateral_token_account_owner",
+      "liquidity_collateral_tokens.mint_address",
+      "liquidity_collateral_tokens.decimals"
     );
 
-  if (tbcAccountIds !== undefined) {
-    query = query.whereIn("tbc_accounts.id", tbcAccountIds);
+  if (liquidityPoolIds !== undefined) {
+    query = query.whereIn("liquidity_pools.id", liquidityPoolIds);
   }
 
   const allAccounts: {
-    tbc_account_id: number;
-    token_a_account_address: string;
-    token_a_account_owner_address: string;
+    liquidity_pool_id: number;
+    collateral_token_account: string;
+    collateral_token_account_owner: string;
     mint_address: string;
     decimals: number;
   }[] = await query;
@@ -95,37 +95,37 @@ export async function getDailyTokenBalances(
     const account = allAccounts[i]!;
     console.log(
       `==== Fetching balances for account ${new PublicKey(
-        account.token_a_account_address
+        account.collateral_token_account
       ).toString()} from ${earliestEndDate} to ${latestEndDate} ====`
     );
 
     try {
       const tokenBalanceDates = await getDailyTokenBalancesBetweenDates(
-        new PublicKey(account.token_a_account_address).toString(),
-        new PublicKey(account.token_a_account_owner_address).toString(),
+        new PublicKey(account.collateral_token_account).toString(),
+        new PublicKey(account.collateral_token_account_owner).toString(),
         new PublicKey(account.mint_address).toString(),
         earliestEndDate,
         latestEndDate,
         account.decimals
       );
 
-      const result = await knex<TBCAccountBalance>("tbc_account_balances")
+      const result = await knex<LiquidityPoolBalance>("liquidity_pool_balances")
         .insert(
           tokenBalanceDates.map((balanceDate) => {
             return {
-              tbc_account_id: account.tbc_account_id,
+              liquidity_pool_id: account.liquidity_pool_id,
               datetime: balanceDate.dateExclusive,
               balance: balanceDate.balance,
             };
           }),
           "*" // need this for postgres to return the added result
         )
-        .onConflict(["tbc_account_id", "datetime"])
+        .onConflict(["liquidity_pool_id", "datetime"])
         .merge(); // just update the balance if there's a conflict
 
       console.log(
         `Inserted balances for ${new PublicKey(
-          account.token_a_account_address
+          account.collateral_token_account
         ).toString()}, pks ${result.map((res) => res.id)}`
       );
     } catch (error) {

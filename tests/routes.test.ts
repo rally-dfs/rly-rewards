@@ -9,8 +9,8 @@ describe("GET /", () => {
     expect(response.status).to.equal(200);
     expect(response.body).to.eql({
       message: "RLY Rewards!",
-      tbc_accounts: [],
-      tbc_balances_by_account: {},
+      liquidity_pools: [],
+      liquidity_balances_by_account: {},
       token_account_mints: [],
       new_token_holder_dates_by_mint: {},
       non_zero_balances_by_mint: {},

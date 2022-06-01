@@ -8,7 +8,7 @@ Note we use npm (and package-lock.json) instead of yarn since it seems to work b
 
 The types in src/knex-types can be used to templatize the knex calls, e.g.
 
-`const result: TBCAccount[] = await knex<TBCAccount>("tbc_accounts")...`
+`const result: LiquidityPool[] = await knex<LiquidityPool>("liquidity_pools")...`
 
 This should be kept up to sync with the db tables/columns that are defined in migrations/
 

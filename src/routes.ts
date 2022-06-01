@@ -1,8 +1,8 @@
 import { PublicKey } from "@solana/web3.js";
 import { Router } from "express";
 import { getKnex } from "./database";
-import { TBCAccount } from "./knex-types/tbc_account";
-import { TBCAccountBalance } from "./knex-types/tbc_account_balance";
+import { LiquidityPool } from "./knex-types/liquidity_pool";
+import { LiquidityPoolBalance } from "./knex-types/liquidity_pool_balance";
 import { TokenAccountBalance } from "./knex-types/token_account_balance";
 import { TokenAccountMint } from "./knex-types/token_account_mint";
 
@@ -13,22 +13,23 @@ const knex = getKnex();
 routes.get("/", async (_req, res) => {
   // this is all just a placeholder to show the data, we would probably split these into dedicated
   // APIs based on the frontend UI (plus the return formats are all inconsistent right now)
-  const accounts = await knex<TBCAccount>("tbc_accounts").select();
+  const accounts = await knex<LiquidityPool>("liquidity_pools").select();
 
-  const tbcAccountBalances = await knex<TBCAccountBalance>(
-    "tbc_account_balances"
+  const liquidityPoolBalances = await knex<LiquidityPoolBalance>(
+    "liquidity_pool_balances"
   )
     .select()
     .orderBy("datetime");
-  const tbcAccountBalancesByAccount: { [key: number]: TBCAccountBalance[] } =
-    {};
-  tbcAccountBalances.reduce((accumulator, accountBalance) => {
-    if (accumulator[accountBalance.tbc_account_id] === undefined) {
-      accumulator[accountBalance.tbc_account_id] = [];
+  const liquidityPoolBalancesByAccount: {
+    [key: number]: LiquidityPoolBalance[];
+  } = {};
+  liquidityPoolBalances.reduce((accumulator, accountBalance) => {
+    if (accumulator[accountBalance.liquidity_pool_id] === undefined) {
+      accumulator[accountBalance.liquidity_pool_id] = [];
     }
-    accumulator[accountBalance.tbc_account_id]?.push(accountBalance);
+    accumulator[accountBalance.liquidity_pool_id]?.push(accountBalance);
     return accumulator;
-  }, tbcAccountBalancesByAccount);
+  }, liquidityPoolBalancesByAccount);
 
   const tokenAccountMints = (
     await knex<TokenAccountMint>("token_account_mints").select()
@@ -160,15 +161,15 @@ routes.get("/", async (_req, res) => {
 
   return res.json({
     message: "RLY Rewards!",
-    tbc_accounts: accounts.map((account) => {
+    liquidity_pools: accounts.map((account) => {
       return {
         id: account.id,
-        token_a_account_address: new PublicKey(
-          account.token_a_account_address
+        collateral_token_account: new PublicKey(
+          account.collateral_token_account
         ).toString(),
       };
     }),
-    tbc_balances_by_account: tbcAccountBalancesByAccount,
+    liquidity_balances_by_account: liquidityPoolBalancesByAccount,
     token_account_mints: tokenAccountMints,
     new_token_holder_dates_by_mint: newTokenHolderDatesByMint,
     non_zero_balances_by_mint: nonZeroBalancesByMint,

@@ -1,23 +1,23 @@
 import { getKnex, closeKnexConnection } from "../src/database";
 import { PublicKey } from "@solana/web3.js";
-import { TBCAccount } from "../src/knex-types/tbc_account";
-import { TBCTokenMint } from "../src/knex-types/tbc_token_mint";
+import { LiquidityPool } from "../src/knex-types/liquidity_pool";
+import { LiquidityCollateralToken } from "../src/knex-types/liquidity_collateral_token";
 import bs58 from "bs58";
 
-/** Inserts new row to tbc_accounts
+/** Inserts new row to liquidity_pools
  *
  * arg 1 is init_transaction_hash: the txn hash that this TBC was initialized in ("null" if it's just a 
  * random token account to track and not part of a TBC, e.g. a liquidity pool)
- * arg 2 is token_a_account_address: pubkey of the token_a_account_address
- * arg 3 is token_a_account_owner_address: pubkey of the owner of token_a_account_address
+ * arg 2 is collateral_token_account: pubkey of the collateral_token_account
+ * arg 3 is collateral_token_account_owner: pubkey of the owner of collateral_token_account
  * arg 4 is token_a_mint_address: mint address of token A (usually sRLY)
  *
- * e.g. $ npm run add-tbc-account \
+ * e.g. $ npm run add-liquidity-pool \
     66tnH1qyBeNMWsGf5ZZUijK14RbzQ9JJ8ZUP15ayrGXMTAQnYPe4S7jhBZ1joHRpBib2khjweTiTXJUs1NfVuGqr \
     4Fce62WKxUeBrR7ShrxjC4WL6gcyeTEUyByCdFufBQuC Eh9mq1m2X2MgiZGd2hfMEbAuKZcbdXTo7EqFUcT9EyVS \
     RLYv2ubRMDLcGG2UyvPmnPmkfuQTsMbg4Jtygc7dmnq
 
- * e.g. $ npm run add-tbc-account \
+ * e.g. $ npm run add-liquidity-pool \
     null \
     4Fce62WKxUeBrR7ShrxjC4WL6gcyeTEUyByCdFufBQuC Eh9mq1m2X2MgiZGd2hfMEbAuKZcbdXTo7EqFUcT9EyVS \
     RLYv2ubRMDLcGG2UyvPmnPmkfuQTsMbg4Jtygc7dmnq
@@ -51,25 +51,27 @@ const main = async () => {
   const tokenAMintAddress = new PublicKey(tokenAMintAddressString!).toBytes();
 
   console.log(
-    `Adding tbc account ${initTransactionHashString}: ${tokenAAccountAddressString}, ` +
+    `Adding liquidity pool ${initTransactionHashString}: ${tokenAAccountAddressString}, ` +
       `${tokenAAccountOwnerAddressString}, ${tokenAMintAddressString}`
   );
 
-  const tokenAMintRow = await knex<TBCTokenMint>("tbc_token_mints")
+  const tokenAMintRow = await knex<LiquidityCollateralToken>(
+    "liquidity_collateral_tokens"
+  )
     .select()
     .where({ mint_address: tokenAMintAddress });
 
-  const result = await knex<TBCAccount>("tbc_accounts").insert(
+  const result = await knex<LiquidityPool>("liquidity_pools").insert(
     {
       init_transaction_hash: initTransactionHash,
-      token_a_account_address: tokenAAccountAddress,
-      token_a_account_owner_address: tokenAAccountOwnerAddress,
-      token_a_mint_id: tokenAMintRow[0]!.id,
+      collateral_token_account: tokenAAccountAddress,
+      collateral_token_account_owner: tokenAAccountOwnerAddress,
+      collateral_token_id: tokenAMintRow[0]!.id,
     },
     "*" // need this for postgres to return the added result
   );
 
-  console.log(`Done adding tbc account PK ${result[0]!.id}`);
+  console.log(`Done adding liquidity pool PK ${result[0]!.id}`);
 
   closeKnexConnection();
 };
