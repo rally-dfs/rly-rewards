@@ -19,6 +19,11 @@ export function getKnex() {
       password: process.env.POSTGRES_PASSWORD || process.env.RDS_PASSWORD,
     };
 
+    if (process.env.NODE_ENV === "test") {
+      connection["database"] =
+        process.env.POSTGRES_TEST_DB_NAME || connection["database"];
+    }
+
     console.log(`initializing knex db connection ${connection.database}`);
 
     knex_connection = knex({
