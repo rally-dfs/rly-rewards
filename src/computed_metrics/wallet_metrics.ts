@@ -26,3 +26,21 @@ export async function totalWallets(
 
   return result[0]?.count;
 }
+
+export async function totalWalletsByDay(trackedTokens: TrackedToken[]) {
+  const startDateFilter = new Date(0);
+
+  const dbResponse: { datetime: Date; count: string }[] = await knex
+    .from("tracked_token_account_balances")
+    .select("datetime")
+    .countDistinct("tracked_token_account_id")
+    .where("datetime", ">=", startDateFilter)
+    .whereIn("tracked_token_account_id", accountIdsForTokens(trackedTokens))
+    .groupBy("datetime")
+    .orderBy("datetime");
+
+  return dbResponse.map((record) => ({
+    date: record.datetime.toISOString(),
+    walletCount: parseInt(record.count),
+  }));
+}
