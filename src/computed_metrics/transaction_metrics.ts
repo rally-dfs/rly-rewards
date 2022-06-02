@@ -8,16 +8,30 @@ export async function totalTransactions(
   mintedTokens: TrackedToken[],
   opts?: { startDate?: Date }
 ) {
+  const byDayCount = await transactionsByDay(mintedTokens, opts);
+
+  return byDayCount.reduce((total, record) => {
+    return total + record.transactionCount;
+  }, 0);
+}
+
+export async function transactionsByDay(
+  trackedTokens: TrackedToken[],
+  opts?: { startDate?: Date }
+) {
   const startDateFilter = opts?.startDate || new Date(0);
 
-  const result = await knex("tracked_token_account_transactions")
+  const dbResponse: { datetime: Date; count: string }[] = await knex
+    .from("tracked_token_account_transactions")
+    .select("datetime")
     .count()
     .where("datetime", ">=", startDateFilter)
-    .whereIn("tracked_token_account_id", accountIdsForTokens(mintedTokens));
+    .whereIn("tracked_token_account_id", accountIdsForTokens(trackedTokens))
+    .groupBy("datetime")
+    .orderBy("datetime");
 
-  if (result.length < 1) {
-    return -1;
-  }
-
-  return result[0]?.count;
+  return dbResponse.map((record) => ({
+    date: record.datetime.toISOString(),
+    transactionCount: parseInt(record.count),
+  }));
 }
