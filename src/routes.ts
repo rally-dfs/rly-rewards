@@ -5,6 +5,19 @@ import { LiquidityPool } from "./knex-types/liquidity_pool";
 import { LiquidityPoolBalance } from "./knex-types/liquidity_pool_balance";
 import { TrackedTokenAccountBalance } from "./knex-types/tracked_token_account_balance";
 import { TrackedToken } from "./knex-types/tracked_token";
+import { LiquidityCollateralToken } from "./knex-types/liquidity_collateral_token";
+import {
+  totalWallets,
+  totalWalletsByDay,
+} from "./computed_metrics/wallet_metrics";
+import {
+  totalValueLockedInPools,
+  valueLockedByDay,
+} from "./computed_metrics/total_value_locked";
+import {
+  totalTransactions,
+  transactionsByDay,
+} from "./computed_metrics/transaction_metrics";
 
 const routes = Router();
 
@@ -179,6 +192,39 @@ routes.get("/", async (_req, res) => {
     new_token_holder_dates_by_mint: newTokenHolderDatesByMint,
     non_zero_balances_by_mint: nonZeroBalancesByMint,
     tracked_token_account_transactions_by_mint: tokenAccountsTransactionsByMint,
+  });
+});
+
+routes.get("/vanity_metrics", async (_req, res) => {
+  const allTrackedTokens = await knex<TrackedToken>("tracked_tokens");
+  const allLiquidityCollateralTokens = await knex<LiquidityCollateralToken>(
+    "liquidity_collateral_tokens"
+  );
+
+  const [
+    totalWalletCount,
+    walletByDayData,
+    transactionCount,
+    transactionsByDayData,
+    tvl,
+    tvlByDay,
+  ] = await Promise.all([
+    totalWallets(allTrackedTokens),
+    totalWalletsByDay(allTrackedTokens),
+    totalTransactions(allTrackedTokens),
+    transactionsByDay(allTrackedTokens),
+    totalValueLockedInPools(allLiquidityCollateralTokens),
+    valueLockedByDay(allLiquidityCollateralTokens),
+  ]);
+
+  res.json({
+    totalTokensTracked: allTrackedTokens.length,
+    totalWallets: totalWalletCount,
+    walletsByDay: walletByDayData,
+    totalTransactions: transactionCount,
+    transactionsByDay: transactionsByDayData,
+    tvl: tvl,
+    tvlByDay: tvlByDay,
   });
 });
 

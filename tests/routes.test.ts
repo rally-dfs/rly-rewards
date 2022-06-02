@@ -18,3 +18,20 @@ describe("GET /", () => {
     });
   });
 });
+
+describe("GET /vanity_metrics", () => {
+  it("returns a JSON payload of dynamically computed vanity metrics", async () => {
+    const response = await request(app).get("/vanity_metrics");
+
+    expect(response.status).to.eql(200);
+    expect(response.body).to.eql({
+      totalTokensTracked: 0,
+      totalWallets: "0",
+      walletsByDay: [],
+      totalTransactions: 0,
+      transactionsByDay: [],
+      tvl: 0,
+      tvlByDay: [],
+    });
+  });
+});
