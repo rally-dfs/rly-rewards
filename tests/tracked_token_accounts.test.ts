@@ -10,6 +10,7 @@ import { TrackedToken } from "../src/knex-types/tracked_token";
 import { TrackedTokenAccount } from "../src/knex-types/tracked_token_account";
 import { TrackedTokenAccountBalance } from "../src/knex-types/tracked_token_account_balance";
 import { TrackedTokenAccountTransaction } from "../src/knex-types/tracked_token_account_transaction";
+import { TrackedTokenAccountBalanceChange } from "../src/knex-types/tracked_token_account_balance_change";
 
 chai.use(chaiExclude);
 
@@ -85,6 +86,31 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
     ).select("*");
     chai
       .expect(tokenAccountBalances)
+      .excluding("id")
+      .to.eql([
+        {
+          tracked_token_account_id: tokenAccounts.find(
+            (account) => account.address === "account1"
+          ).id,
+          datetime: new Date("2022-06-01"),
+          approximate_minimum_balance: "10",
+        },
+        {
+          tracked_token_account_id: tokenAccounts.find(
+            (account) => account.address === "account2"
+          ).id,
+          datetime: new Date("2022-06-01"),
+          approximate_minimum_balance: "20",
+        },
+      ]);
+
+    // changes is basically the same as balances for the first day
+    const tokenAccountBalanceChanges =
+      await knex<TrackedTokenAccountBalanceChange>(
+        "tracked_token_account_balance_changes"
+      ).select("*");
+    chai
+      .expect(tokenAccountBalanceChanges)
       .excluding("id")
       .to.eql([
         {
@@ -284,6 +310,61 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
           datetime: new Date("2022-06-03"),
           approximate_minimum_balance: "20",
         },
+        {
+          tracked_token_account_id: updatedTokenAccounts.find(
+            (account) => account.address === "account3"
+          ).id,
+          datetime: new Date("2022-06-03"),
+          approximate_minimum_balance: "300",
+        },
+        {
+          tracked_token_account_id: updatedTokenAccounts.find(
+            (account) => account.address === "account4"
+          ).id,
+          datetime: new Date("2022-06-03"),
+          approximate_minimum_balance: "40",
+        },
+      ]);
+
+    // changes should only have the net new rows and not the unchanged ones
+    const updatedTokenAccountBalanceChanges =
+      await knex<TrackedTokenAccountBalanceChange>(
+        "tracked_token_account_balance_changes"
+      ).select("*");
+    chai
+      .expect(updatedTokenAccountBalanceChanges)
+      .excluding("id")
+      .to.eql([
+        {
+          tracked_token_account_id: updatedTokenAccounts.find(
+            (account) => account.address === "account1"
+          ).id,
+          datetime: new Date("2022-06-01"),
+          approximate_minimum_balance: "10",
+        },
+        {
+          tracked_token_account_id: updatedTokenAccounts.find(
+            (account) => account.address === "account2"
+          ).id,
+          datetime: new Date("2022-06-01"),
+          approximate_minimum_balance: "20",
+        },
+        // make sure 6/2 balances don't include the unchanged account2 from 6/1
+        {
+          tracked_token_account_id: updatedTokenAccounts.find(
+            (account) => account.address === "account1"
+          ).id,
+          datetime: new Date("2022-06-02"),
+          approximate_minimum_balance: "0",
+        },
+        {
+          tracked_token_account_id: updatedTokenAccounts.find(
+            (account) => account.address === "account3"
+          ).id,
+          datetime: new Date("2022-06-02"),
+          approximate_minimum_balance: "30",
+        },
+        // make sure the 6/3 balances only include the new days
         {
           tracked_token_account_id: updatedTokenAccounts.find(
             (account) => account.address === "account3"

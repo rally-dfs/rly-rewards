@@ -3,6 +3,7 @@ import { getAllTrackedTokenAccountInfoAndTransactions } from "./chain-data-utils
 import { TrackedTokenAccount } from "./knex-types/tracked_token_account";
 import { TrackedTokenAccountBalance } from "./knex-types/tracked_token_account_balance";
 import { TrackedTokenAccountTransaction } from "./knex-types/tracked_token_account_transaction";
+import { TrackedTokenAccountBalanceChange } from "./knex-types/tracked_token_account_balance_change";
 
 /** Calls getAllTrackedTokenAccountInfoAndTransactions for all token accounts from `previously fetched end date + 24 hours`
  * (inclusive) to `end date` (exclusive).
@@ -260,6 +261,36 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
     }
     return true;
   });
+
+  // next insert all the TrackedTokenAccountBalances and TrackedTokenAccountBalanceChanges
+  const tokenAccountBalanceChangesRows = filteredAccountInfos
+    .filter((accountInfo) => {
+      // balance is optional due to solana.fm flakiness so just skip those rows if they don't exist
+      return accountInfo.approximateMinimumBalance !== undefined;
+    })
+    .map((accountInfo) => {
+      return {
+        tracked_token_account_id: parseInt(
+          accountIdsByAddress[accountInfo.tokenAccountAddress]!
+        ),
+        datetime: endDateExclusive,
+        approximate_minimum_balance: accountInfo.approximateMinimumBalance,
+      };
+    });
+
+  if (tokenAccountBalanceChangesRows.length > 0) {
+    for (let i = 0; i < tokenAccountBalanceChangesRows.length; i += chunkSize) {
+      await knex<TrackedTokenAccountBalanceChange>(
+        "tracked_token_account_balance_changes"
+      )
+        .insert(
+          tokenAccountBalanceChangesRows.slice(i, i + chunkSize),
+          "*" // need this for postgres to return the added result
+        )
+        .onConflict(["tracked_token_account_id", "datetime"])
+        .merge(); // just update the balance if there's a conflict
+    }
+  }
 
   // TrackedTokenAccountBalances:
   // copy previous day's balances into a new dict (we could instead do whatever most recent date has any data for a
