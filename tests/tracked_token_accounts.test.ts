@@ -29,7 +29,7 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
 
     const queriesStub = stub(
       queries,
-      "getAllTrackedTokenAccountInfoAndTransactions"
+      "getAllSolanaTrackedTokenAccountInfoAndTransactions"
     );
 
     // two accounts on first call (6/1)

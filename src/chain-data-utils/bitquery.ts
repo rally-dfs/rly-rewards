@@ -1,3 +1,4 @@
+import { TrackedTokenAccountInfo } from "./combined_queries";
 import { queryGQL } from "./graphql";
 
 async function _queryBitqueryGQL(queryString: string, variables?: object) {
@@ -329,4 +330,151 @@ export async function getSolanaTransactionSuccessForHashesBitquery(
   }
 
   return hashToSuccessMap;
+}
+
+type BitqueryEthereumTransfer = {
+  amount: number;
+  sender: BitqueryEthereumAddressInfo;
+  receiver: BitqueryEthereumAddressInfo;
+  // hacky way of getting time by using "maximum(of: time)", format is a bit weird too e.g. "2022-05-08 01:55:09 UTC"
+  maximum: string;
+  transaction: BitqueryEthereumTransactionInfo;
+};
+
+type BitqueryEthereumAddressInfo = {
+  address: string;
+};
+
+type BitqueryEthereumTransactionInfo = {
+  hash: string;
+};
+
+/** Similar to _solanaTransferAmountsWithFilter but for ethereum
+ *
+ * @param tokenMintAddress
+ * @param startDateInclusive
+ * @param endDateExclusive
+ */
+async function _ethereumTransferAmountsWithFilter(
+  tokenMintAddress: string,
+  startDateInclusive: Date,
+  endDateExclusive: Date
+  // we don't currently need sender/receiver filters like with `_solanaTransferAmountsWithFilter` but could similarly
+  // add them in the future if needed
+) {
+  // bitquery treats endDate as inclusive, so we need to subtract 1 millisecond from endDateExclusive
+  // (bitquery doesn't have sub-second precision anyway and seems to just drop any milliseconds passed in, so this
+  // is basically the same as subtracting 1 second, i.e. we should be calling T00:00:00Z to T23:59:59Z instead of
+  // T00:00:00Z to T00:00:00Z to avoid duplicates/undercounting
+  const endDateInclusive = new Date(endDateExclusive.valueOf() - 1);
+
+  const queryString = `query EthTransfersForToken(
+      $startTime: ISO8601DateTime!, $endTime: ISO8601DateTime!, $tokenMintAddress: String!,
+      $limit: Int!, $offset: Int!) {
+    ethereum {
+      transfers(
+        options: {limit: $limit, offset: $offset}
+        time: {between: [$startTime, $endTime]}
+        currency: {is: $tokenMintAddress}
+        success: true
+      ) {
+        amount
+        sender {
+          address
+        }
+        receiver {
+          address
+        }
+        maximum(of: time)
+        transaction {
+          hash
+          txFrom {
+            address
+          }
+        }
+      }
+    }
+  }`;
+
+  const variables = {
+    startTime: startDateInclusive.toISOString(),
+    endTime: endDateInclusive.toISOString(),
+    tokenMintAddress: tokenMintAddress,
+    // `limit` and `offset` will be added by _fetchAllPagesWithQueryAndVariables
+  };
+
+  return _fetchAllPagesWithQueryAndVariables<BitqueryEthereumTransfer>(
+    queryString,
+    variables,
+    (data) => data["ethereum"]["transfers"]
+  );
+}
+
+/** Similar to combined_queries.getAllTokenAccountInfoAndTransactions but for ethereum.
+ *
+ * Calls bitquery to get the token accounts and transactions info
+ * TODO: we need to call a separate API to get balances since `transfers` doesn't have that info,
+ * ethereum.address.balances.history on bitquery might work
+ *
+ * @param tokenMintAddress
+ * @param startDateInclusive
+ * @param endDateExclusive
+ */
+export async function getAllEthTokenAddressInfoAndTransactions(
+  tokenMintAddress: string,
+  _tokenMintDecimals: number,
+  startDateInclusive: Date,
+  endDateExclusive: Date
+): Promise<TrackedTokenAccountInfo[]> {
+  let results = await _ethereumTransferAmountsWithFilter(
+    tokenMintAddress,
+    startDateInclusive,
+    endDateExclusive
+  );
+
+  let accountInfoMap: { [key: string]: TrackedTokenAccountInfo } = {};
+
+  results.forEach((result) => {
+    if (accountInfoMap[result.sender.address] === undefined) {
+      accountInfoMap[result.sender.address] = {
+        tokenAccountAddress: result.sender.address,
+        incomingTransactions: new Set<string>(),
+        outgoingTransactions: new Set<string>(),
+      };
+    }
+
+    if (accountInfoMap[result.receiver.address] === undefined) {
+      accountInfoMap[result.receiver.address] = {
+        tokenAccountAddress: result.receiver.address,
+        incomingTransactions: new Set<string>(),
+        outgoingTransactions: new Set<string>(),
+      };
+    }
+
+    accountInfoMap[result.sender.address]!.outgoingTransactions.add(
+      result.transaction.hash
+    );
+    accountInfoMap[result.receiver.address]!.incomingTransactions.add(
+      result.transaction.hash
+    );
+  });
+
+  console.log(results.length, " results");
+
+  console.log(`incoming
+    ${Object.values(accountInfoMap).reduce(
+      (acc, info) => acc + [...info.incomingTransactions].length,
+      0
+    )}`);
+
+  console.log(`outgoing
+    ${Object.values(accountInfoMap).reduce(
+      (acc, info) => acc + [...info.outgoingTransactions].length,
+      0
+    )}`);
+
+  // TODO: we need to call a separate API to get balances since `transfers` doesn't have that info,
+  // ethereum.address.balances.history on bitquery might work, or maybe easier just to get it from on chain
+
+  return Object.values(accountInfoMap);
 }

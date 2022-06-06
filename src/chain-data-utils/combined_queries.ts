@@ -203,7 +203,7 @@ export type TrackedTokenAccountInfo = {
  * @param startDateInclusive
  * @param endDateExclusive
  */
-export async function getAllTrackedTokenAccountInfoAndTransactions(
+export async function getAllSolanaTrackedTokenAccountInfoAndTransactions(
   tokenMintAddress: string,
   tokenMintDecimals: number,
   startDateInclusive: Date,
