@@ -8,5 +8,5 @@ export interface TrackedTokenAccountBalanceChange {
   id?: number;
   tracked_token_account_id: number;
   datetime: Date;
-  approximate_minimum_balance: number;
+  approximate_minimum_balance: string;
 }

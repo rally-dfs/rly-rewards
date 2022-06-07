@@ -1,4 +1,5 @@
 import { TrackedTokenAccountInfo } from "./combined_queries";
+import { getERC20BalancesForAddressesAtBlocks } from "./ethereum";
 import { queryGQL } from "./graphql";
 
 async function _queryBitqueryGQL(queryString: string, variables?: object) {
@@ -333,20 +334,10 @@ export async function getSolanaTransactionSuccessForHashesBitquery(
 }
 
 type BitqueryEthereumTransfer = {
-  amount: number;
-  sender: BitqueryEthereumAddressInfo;
-  receiver: BitqueryEthereumAddressInfo;
-  // hacky way of getting time by using "maximum(of: time)", format is a bit weird too e.g. "2022-05-08 01:55:09 UTC"
-  maximum: string;
-  transaction: BitqueryEthereumTransactionInfo;
-};
-
-type BitqueryEthereumAddressInfo = {
-  address: string;
-};
-
-type BitqueryEthereumTransactionInfo = {
-  hash: string;
+  sender: { address: string };
+  receiver: { address: string };
+  transaction: { hash: string };
+  block: { height: number; timestamp: { iso8601: Date } };
 };
 
 /** Similar to _solanaTransferAmountsWithFilter but for ethereum
@@ -378,18 +369,19 @@ async function _ethereumTransferAmountsWithFilter(
         currency: {is: $tokenMintAddress}
         success: true
       ) {
-        amount
         sender {
           address
         }
         receiver {
           address
         }
-        maximum(of: time)
         transaction {
           hash
-          txFrom {
-            address
+        }
+        block {
+          height
+          timestamp {
+            iso8601
           }
         }
       }
@@ -434,10 +426,34 @@ export async function getAllEthTokenAddressInfoAndTransactions(
 
   let accountInfoMap: { [key: string]: TrackedTokenAccountInfo } = {};
 
+  // get balances at the most recent block
+  const addressToBlocks: { [key: string]: number } = {};
+  results.reduce((addressToBlocks, result) => {
+    if (
+      addressToBlocks[result.receiver.address] === undefined ||
+      addressToBlocks[result.receiver.address]! < result.block.height
+    ) {
+      addressToBlocks[result.receiver.address] = result.block.height;
+    }
+    if (
+      addressToBlocks[result.sender.address] === undefined ||
+      addressToBlocks[result.sender.address]! < result.block.height
+    ) {
+      addressToBlocks[result.sender.address] = result.block.height;
+    }
+    return addressToBlocks;
+  }, addressToBlocks);
+
+  const addressToBalances = await getERC20BalancesForAddressesAtBlocks(
+    tokenMintAddress,
+    addressToBlocks
+  );
+
   results.forEach((result) => {
     if (accountInfoMap[result.sender.address] === undefined) {
       accountInfoMap[result.sender.address] = {
         tokenAccountAddress: result.sender.address,
+        approximateMinimumBalance: addressToBalances[result.sender.address],
         incomingTransactions: new Set<string>(),
         outgoingTransactions: new Set<string>(),
       };
@@ -446,6 +462,7 @@ export async function getAllEthTokenAddressInfoAndTransactions(
     if (accountInfoMap[result.receiver.address] === undefined) {
       accountInfoMap[result.receiver.address] = {
         tokenAccountAddress: result.receiver.address,
+        approximateMinimumBalance: addressToBalances[result.receiver.address],
         incomingTransactions: new Set<string>(),
         outgoingTransactions: new Set<string>(),
       };
@@ -461,17 +478,6 @@ export async function getAllEthTokenAddressInfoAndTransactions(
 
   console.log(results.length, " results");
 
-  console.log(`incoming
-    ${Object.values(accountInfoMap).reduce(
-      (acc, info) => acc + [...info.incomingTransactions].length,
-      0
-    )}`);
-
-  console.log(`outgoing
-    ${Object.values(accountInfoMap).reduce(
-      (acc, info) => acc + [...info.outgoingTransactions].length,
-      0
-    )}`);
 
   // TODO: we need to call a separate API to get balances since `transfers` doesn't have that info,
   // ethereum.address.balances.history on bitquery might work, or maybe easier just to get it from on chain

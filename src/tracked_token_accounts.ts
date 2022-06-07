@@ -84,7 +84,7 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
 
   const mostRecentBalances: {
     tracked_token_account_id: number;
-    approximate_minimum_balance: number;
+    approximate_minimum_balance: string;
     datetime: Date;
     token_id: number;
   }[] = await knex("tracked_token_account_balances")
@@ -109,7 +109,7 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
   // {token_id: {date_string: {account_id: balance}}}
   const balancesByDateByTokenId: {
     [key: string]: {
-      [key: string]: { [key: string]: number };
+      [key: string]: { [key: string]: string };
     };
   } = {};
   mostRecentBalances.forEach((balance) => {
@@ -207,7 +207,7 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
   decimals: number,
   chain: TrackedTokenChain,
   accountIdsByAddress: { [key: string]: string },
-  balancesByDate: { [key: string]: { [key: string]: number } },
+  balancesByDate: { [key: string]: { [key: string]: string } },
   endDateExclusive: Date
 ) {
   const knex = getKnex();
