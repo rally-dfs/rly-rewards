@@ -1,3 +1,5 @@
+import { PublicKey } from "@solana/web3.js";
+import { isAddress } from "web3-utils";
 import { getKnex, closeKnexConnection } from "../src/database";
 import {
   TrackedToken,
@@ -25,8 +27,20 @@ const main = async () => {
   let chain: TrackedTokenChain;
   if (chainString!.toLowerCase() === "solana") {
     chain = "solana";
+
+    // validate that pubkey is valid
+    new PublicKey(mintAddressString!);
   } else if (chainString!.toLowerCase() === "ethereum") {
     chain = "ethereum";
+
+    if (!isAddress(mintAddressString!)) {
+      console.error(`Invalid ethereum address ${mintAddressString}`);
+      return;
+    }
+
+    mintAddressString = mintAddressString?.startsWith("0x")
+      ? mintAddressString
+      : "0x" + mintAddressString;
   } else {
     console.error("Invalid chain, must be SOLANA or ETHEREUM");
     return;
