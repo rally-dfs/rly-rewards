@@ -3,6 +3,7 @@ import { getAllTrackedTokenAccountInfoAndTransactions } from "./chain-data-utils
 import { TrackedTokenAccount } from "./knex-types/tracked_token_account";
 import { TrackedTokenAccountBalance } from "./knex-types/tracked_token_account_balance";
 import { TrackedTokenAccountTransaction } from "./knex-types/tracked_token_account_transaction";
+import { TrackedTokenAccountBalanceChange } from "./knex-types/tracked_token_account_balance_change";
 
 /** Calls getAllTrackedTokenAccountInfoAndTransactions for all token accounts from `previously fetched end date + 24 hours`
  * (inclusive) to `end date` (exclusive).
@@ -17,6 +18,8 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
   forceOneDay: boolean
 ) {
   const knex = getKnex();
+
+  const lastEndDate = new Date(`${lastEndDateString}T00:00:00Z`);
 
   // TODO: this is a pretty huge query, it's mostly needed to map token_address => ids when inserting into
   // tracked_token_account_balances and tracked_token_account_transactions below but we could probably avoid this if we did more
@@ -42,58 +45,107 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
       "tracked_token_accounts.address as account_address"
     );
 
-  // {token_id: {address: "...", accounts: {account_address: account_id}}}
+  // {token_id: {address: "...", decimals: 9, accountIdsByAddress: {account_address: account_id}}}
   // make a dictionary to quickly look up info by mint and account PKs for below
-  let tokenAccountsByMint: {
+  let tokenAccountsByToken: {
     [key: string]: {
       mint_address: string;
       decimals: number;
-      accounts: { [key: string]: string };
+      accountIdsByAddress: { [key: string]: string };
     };
   } = {};
   allTrackedTokenAccounts.forEach((account) => {
-    if (tokenAccountsByMint[account.token_id] === undefined) {
-      tokenAccountsByMint[account.token_id] = {
+    if (tokenAccountsByToken[account.token_id] === undefined) {
+      tokenAccountsByToken[account.token_id] = {
         mint_address: account.mint_address,
         decimals: account.decimals,
-        accounts: {},
+        accountIdsByAddress: {},
       };
     }
 
     // if the mint has 0 accounts, then this row will have a `null` account
     if (account.account_id) {
-      tokenAccountsByMint[account.token_id]!.accounts[account.account_address] =
-        account.account_id.toString();
+      tokenAccountsByToken[account.token_id]!.accountIdsByAddress[
+        account.account_address
+      ] = account.account_id.toString();
     }
   });
 
-  const allMintIds = Object.keys(tokenAccountsByMint);
+  const allTrackedTokenIds = Object.keys(tokenAccountsByToken);
 
-  const maxDateByMintId: { token_id: number; max_datetime: Date }[] =
-    await knex("tracked_token_account_transactions")
-      .join(
-        "tracked_token_accounts",
-        "tracked_token_accounts.id",
-        "tracked_token_account_transactions.tracked_token_account_id"
-      )
-      .select("tracked_token_accounts.token_id")
-      .where("datetime", "<", lastEndDateString)
-      .max("datetime as max_datetime")
-      .groupBy("tracked_token_accounts.token_id");
+  const mostRecentBalances: {
+    tracked_token_account_id: number;
+    approximate_minimum_balance: number;
+    datetime: Date;
+    token_id: number;
+  }[] = await knex("tracked_token_account_balances")
+    .join(
+      "tracked_token_accounts",
+      "tracked_token_accounts.id",
+      "tracked_token_account_balances.tracked_token_account_id"
+    )
+    .distinctOn("tracked_token_account_id")
+    .select(
+      "tracked_token_account_id",
+      "approximate_minimum_balance",
+      "datetime",
+      "tracked_token_accounts.token_id"
+    )
+    .where("datetime", "<", lastEndDate)
+    .orderBy([
+      { column: "tracked_token_account_id" },
+      { column: "datetime", order: "desc" },
+    ]);
 
-  for (let i = 0; i < allMintIds.length; i++) {
-    const mintId = allMintIds[i]!;
-    const mintAddress = tokenAccountsByMint[mintId]!.mint_address;
-    const decimals = tokenAccountsByMint[mintId]!.decimals;
-    const accountsMap = tokenAccountsByMint[mintId]!.accounts!;
+  // {token_id: {date_string: {account_id: balance}}}
+  const balancesByDateByTokenId: {
+    [key: string]: {
+      [key: string]: { [key: string]: number };
+    };
+  } = {};
+  mostRecentBalances.forEach((balance) => {
+    const dateString = balance.datetime.toISOString();
 
-    const lastEndDate = new Date(`${lastEndDateString}T00:00:00Z`);
+    if (balancesByDateByTokenId[balance.token_id] === undefined) {
+      balancesByDateByTokenId[balance.token_id] = {};
+    }
+
+    if (balancesByDateByTokenId[balance.token_id]![dateString] === undefined) {
+      balancesByDateByTokenId[balance.token_id]![dateString] = {};
+    }
+
+    balancesByDateByTokenId[balance.token_id]![dateString]![
+      balance.tracked_token_account_id
+    ] = balance.approximate_minimum_balance;
+  });
+
+  for (let i = 0; i < allTrackedTokenIds.length; i++) {
+    const tokenId = allTrackedTokenIds[i]!;
+    const mintAddress = tokenAccountsByToken[tokenId]!.mint_address;
+    const decimals = tokenAccountsByToken[tokenId]!.decimals;
+    const accountIdsByAddress =
+      tokenAccountsByToken[tokenId]!.accountIdsByAddress!;
+
+    // just use an empty object {} for the very first data fetch for this token
+    const balancesByDate = balancesByDateByTokenId[tokenId] || {};
+
+    // at this point there should only be at most one date_string key for the most recent date (unless something went
+    // wrong previously, i.e. for some `date`, some accounts got an updated balance row but others didn't).
+    // we'll update this in-memory dictionary with more days' data if we're fetching multiple days in the loop below
+    if (Object.keys(balancesByDate).length > 1) {
+      console.error(
+        `Data inconsistency for tracked token ${tokenId}, multiple "most recent dates" available: ${Object.keys(
+          balancesByDate
+        )}`
+      );
+      continue; // better to bail on this token here instead of trying to fetch data on top of partially incorrect data
+    }
 
     // if we have some past data (and the `forceOneDay` flag is off), start with day + 1.
     // otherwise just start with lastEndDate and do one iteration
-    const maxDate = maxDateByMintId.find(
-      (value) => value.token_id === parseInt(mintId)
-    )?.max_datetime;
+    const maxDate = Object.keys(balancesByDate)[0]
+      ? new Date(Object.keys(balancesByDate)[0]!)
+      : undefined;
     const maxDatePlusOne = maxDate
       ? new Date(
           new Date(
@@ -109,10 +161,11 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
 
     while (currentEndDate <= lastEndDate) {
       await _getTrackedTokenAccountInfoForMintAndEndDate(
-        mintId,
+        tokenId,
         mintAddress,
         decimals,
-        accountsMap,
+        accountIdsByAddress,
+        balancesByDate,
         currentEndDate
       );
 
@@ -125,17 +178,21 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
  * Would need to refactor better to make it usable externally (it currently requires some specific set up/data
  * prefetching)
  *
- * @param mintId
+ * @param tokenId
  * @param mintAddress
  * @param decimals
- * @param accountsMap
+ * @param accountIdsByAddress Dictionary of {account_address: db_id}. Will be updated with any new accounts fetched and
+ * inserted into the DB during this run (needed for future calls of this function)
+ * @param balancesByDate Dictionary of {date: {account_id: balance}}. Will be updated with `endDateExclusive`'s
+ * new balance data (needed for future calls of this function)
  * @param endDateExclusive
  */
 async function _getTrackedTokenAccountInfoForMintAndEndDate(
-  mintId: string,
+  tokenId: string,
   mintAddress: string,
   decimals: number,
-  accountsMap: { [key: string]: string },
+  accountIdsByAddress: { [key: string]: string },
+  balancesByDate: { [key: string]: { [key: string]: number } },
   endDateExclusive: Date
 ) {
   const knex = getKnex();
@@ -155,48 +212,46 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
     endDateExclusive
   );
 
-  if (accountInfos.length == 0) {
-    return;
-  }
+  if (accountInfos.length > 0) {
+    // first insert any new TrackedTokenAccounts
+    const tokenAccounts = accountInfos.map((accountInfo) => {
+      return {
+        address: accountInfo.tokenAccountAddress,
+        owner_address: accountInfo.ownerAccountAddress,
+        token_id: parseInt(tokenId),
+        first_transaction_date: endDateExclusive,
+      };
+    });
 
-  // first insert all the TrackedTokenAccounts
-  const tokenAccounts = accountInfos.map((accountInfo) => {
-    return {
-      address: accountInfo.tokenAccountAddress,
-      owner_address: accountInfo.ownerAccountAddress,
-      token_id: parseInt(mintId),
-      first_transaction_date: endDateExclusive,
-    };
-  });
-
-  for (let i = 0; i < tokenAccounts.length; i += chunkSize) {
-    const tokenAccountsResults = await knex<TrackedTokenAccount>(
-      "tracked_token_accounts"
-    )
-      .insert(
-        tokenAccounts.slice(i, i + chunkSize),
-        "*" // need this for postgres to return the added result
+    for (let i = 0; i < tokenAccounts.length; i += chunkSize) {
+      const tokenAccountsResults = await knex<TrackedTokenAccount>(
+        "tracked_token_accounts"
       )
-      .onConflict(["address"])
-      // update first_transaction_date if endDateExclusive is further in the past (i.e. if we called this for a date
-      // backwards in time than the existing data)
-      .merge({ first_transaction_date: endDateExclusive })
-      .where(
-        "tracked_token_accounts.first_transaction_date",
-        ">",
-        endDateExclusive
-      );
+        .insert(
+          tokenAccounts.slice(i, i + chunkSize),
+          "*" // need this for postgres to return the added result
+        )
+        .onConflict(["address"])
+        // update first_transaction_date if endDateExclusive is further in the past (i.e. if we called this for a date
+        // backwards in time than the existing data)
+        .merge({ first_transaction_date: endDateExclusive })
+        .where(
+          "tracked_token_accounts.first_transaction_date",
+          ">",
+          endDateExclusive
+        );
 
-    // update accountsMap with the newly added items (tokenAccountResults doesn't include the already existing
-    // rows that weren't inserted)
-    tokenAccountsResults.reduce((accountsMap, result) => {
-      accountsMap[result.address] = result.id!.toString();
-      return accountsMap;
-    }, accountsMap);
+      // update accountsMap with the newly added items (tokenAccountResults doesn't include the already existing
+      // rows that weren't inserted)
+      tokenAccountsResults.reduce((accountsMap, result) => {
+        accountsMap[result.address] = result.id!.toString();
+        return accountsMap;
+      }, accountIdsByAddress);
+    }
   }
 
   const filteredAccountInfos = accountInfos.filter((accountInfo) => {
-    if (!accountsMap[accountInfo.tokenAccountAddress]) {
+    if (!accountIdsByAddress[accountInfo.tokenAccountAddress]) {
       // this shouldn't ever happen, means something with the above merging logic went wrong
       console.error(
         "updated accountsMap missing address",
@@ -207,11 +262,8 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
     return true;
   });
 
-  // next insert all the TrackedTokenAccountBalances
-  // TODO: currently if day_n has a row and day_n+1 has no row, it implies the balance is unchanged
-  // this makes reading "what was balance on x date" less efficient - if it becomes a problem we could probably
-  // just create a new denormalized table that stores the daily counts of non-zero balance accounts or something
-  const tokenAccountBalancesRows = filteredAccountInfos
+  // next insert all the TrackedTokenAccountBalances and TrackedTokenAccountBalanceChanges
+  const tokenAccountBalanceChangesRows = filteredAccountInfos
     .filter((accountInfo) => {
       // balance is optional due to solana.fm flakiness so just skip those rows if they don't exist
       return accountInfo.approximateMinimumBalance !== undefined;
@@ -219,12 +271,53 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
     .map((accountInfo) => {
       return {
         tracked_token_account_id: parseInt(
-          accountsMap[accountInfo.tokenAccountAddress]!
+          accountIdsByAddress[accountInfo.tokenAccountAddress]!
         ),
         datetime: endDateExclusive,
         approximate_minimum_balance: accountInfo.approximateMinimumBalance,
       };
     });
+
+  if (tokenAccountBalanceChangesRows.length > 0) {
+    for (let i = 0; i < tokenAccountBalanceChangesRows.length; i += chunkSize) {
+      await knex<TrackedTokenAccountBalanceChange>(
+        "tracked_token_account_balance_changes"
+      )
+        .insert(
+          tokenAccountBalanceChangesRows.slice(i, i + chunkSize),
+          "*" // need this for postgres to return the added result
+        )
+        .onConflict(["tracked_token_account_id", "datetime"])
+        .merge(); // just update the balance if there's a conflict
+    }
+  }
+
+  // TrackedTokenAccountBalances:
+  // copy previous day's balances into a new dict (we could instead do whatever most recent date has any data for a
+  // given account, but seems cleaner to not skip days if there's some bug causing missing days/accounts, easier to just
+  // copy no data for the day and manually investigate than to partially update the day)
+  const currentDayBalances = {
+    ...(balancesByDate[startDateInclusive.toISOString()] || {}),
+  };
+
+  // update with new balances from current day and write that into TrackedTokenAccountBalance
+  filteredAccountInfos.forEach((accountInfo) => {
+    // balance is optional due to solana.fm flakiness so just keep previous day's data
+    // TODO: we could improve this by falling back on bitquery's delta_balance data
+    if (accountInfo.approximateMinimumBalance !== undefined) {
+      currentDayBalances[
+        accountIdsByAddress[accountInfo.tokenAccountAddress]!
+      ] = accountInfo.approximateMinimumBalance;
+    }
+  });
+
+  const tokenAccountBalancesRows = Object.entries(currentDayBalances).map(
+    ([accountId, balance]) => ({
+      tracked_token_account_id: parseInt(accountId),
+      datetime: endDateExclusive,
+      approximate_minimum_balance: balance,
+    })
+  );
 
   if (tokenAccountBalancesRows.length > 0) {
     for (let i = 0; i < tokenAccountBalancesRows.length; i += chunkSize) {
@@ -238,6 +331,9 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
     }
   }
 
+  // update balancesByDay (just needed if we're calling this function for multiple days at once)
+  balancesByDate[endDateExclusive.toISOString()] = currentDayBalances;
+
   // finally, insert the TrackedTokenAccountTransactions
   const incomingTransactionRows: TrackedTokenAccountTransaction[] = [];
   const outgoingTransactionRows: TrackedTokenAccountTransaction[] = [];
@@ -247,7 +343,7 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
       ...[...accountInfo.incomingTransactions].map((hash) => {
         return {
           tracked_token_account_id: parseInt(
-            accountsMap[accountInfo.tokenAccountAddress]!
+            accountIdsByAddress[accountInfo.tokenAccountAddress]!
           ),
           datetime: endDateExclusive,
           transaction_hash: hash!,
@@ -260,7 +356,7 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
       ...[...accountInfo.outgoingTransactions].map((hash) => {
         return {
           tracked_token_account_id: parseInt(
-            accountsMap[accountInfo.tokenAccountAddress]!
+            accountIdsByAddress[accountInfo.tokenAccountAddress]!
           ),
           datetime: endDateExclusive,
           transaction_hash: hash!,

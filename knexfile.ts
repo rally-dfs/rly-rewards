@@ -20,6 +20,24 @@ const config: { [key: string]: Knex.Config } = {
     },
   },
 
+  test: {
+    client: "postgresql",
+    connection: {
+      host: process.env.POSTGRES_HOSTNAME,
+      port: parseInt(process.env.POSTGRES_PORT!),
+      database: process.env.POSTGRES_TEST_DB_NAME,
+      user: process.env.POSTGRES_USERNAME,
+      password: process.env.POSTGRES_PASSWORD,
+    },
+    pool: {
+      min: 2,
+      max: 10,
+    },
+    migrations: {
+      tableName: "knex_migrations",
+    },
+  },
+
   staging: {
     client: "postgresql",
     connection: {

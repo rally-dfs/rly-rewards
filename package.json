@@ -6,11 +6,12 @@
   "scripts": {
     "format": "prettier -w .",
     "build": "tsc -p tsconfig.json",
-    "test": "ts-mocha tests/*.test.ts tests/**/*.test.ts",
+    "test": "NODE_ENV=test ts-mocha tests/*.test.ts tests/**/*.test.ts",
     "dev": "nodemon src/server.ts",
     "prod": "node dist/server.js",
     "prestart": "./node_modules/.bin/knex migrate:latest",
     "knex": "./node_modules/.bin/knex",
+    "migrate-test": "./node_modules/.bin/knex migrate:latest --env=test",
     "add-liquidity-collateral-token": "ts-node ./scripts/add_liquidity_collateral_token.ts",
     "add-liquidity-pool": "ts-node ./scripts/add_liquidity_pool.ts",
     "get-daily-liquidity-balances": "ts-node ./scripts/get_daily_liquidity_balances.ts",
@@ -41,11 +42,14 @@
   "devDependencies": {
     "@types/chai": "^4.3.1",
     "@types/mocha": "^9.1.1",
+    "@types/sinon": "^10.0.11",
     "@types/supertest": "^2.0.12",
     "chai": "^4.3.6",
+    "chai-exclude": "^2.1.0",
     "mocha": "^10.0.0",
     "nodemon": "^2.0.16",
     "prettier": "^2.6.2",
+    "sinon": "^14.0.0",
     "supertest": "^6.2.3",
     "ts-mocha": "^10.0.0"
   }
