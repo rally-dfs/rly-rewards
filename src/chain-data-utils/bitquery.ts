@@ -478,7 +478,6 @@ export async function getAllEthTokenAddressInfoAndTransactions(
 
   console.log(results.length, " results");
 
-
   // TODO: we need to call a separate API to get balances since `transfers` doesn't have that info,
   // ethereum.address.balances.history on bitquery might work, or maybe easier just to get it from on chain
 
