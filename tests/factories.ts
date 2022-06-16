@@ -50,7 +50,7 @@ export async function createLiquidityCollateralToken(displayName: string) {
   ).insert(
     {
       display_name: displayName,
-      decimals: 9,
+      decimals: 2,
       mint_address: fakeAddressSeed.toString(),
     },
     "*"
