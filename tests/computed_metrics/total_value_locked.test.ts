@@ -44,17 +44,17 @@ describe("Total Value Locked Computed Metrics", () => {
     it("returns the total sum of the most recent balance for all pools with the given collateral tokens", async () => {
       await knex<LiquidityPoolBalance>("liquidity_pool_balances").insert([
         {
-          balance: 10,
+          balance: 1000,
           liquidity_pool_id: pool1.id,
           datetime: new Date("2022-05-20"),
         },
         {
-          balance: 5,
+          balance: 500,
           liquidity_pool_id: pool1.id,
           datetime: new Date("2022-05-19"),
         },
         {
-          balance: 25,
+          balance: 2500,
           liquidity_pool_id: pool2.id,
           datetime: new Date("2022-05-19"),
         },
@@ -62,29 +62,29 @@ describe("Total Value Locked Computed Metrics", () => {
 
       expect(
         await totalValueLockedInPools([collaterToken1, collaterToken2])
-      ).to.equal("35");
+      ).to.equal(35);
     });
 
     it("can ignore balances for collateral tokens we don't care about ", async () => {
       await knex<LiquidityPoolBalance>("liquidity_pool_balances").insert([
         {
-          balance: 10,
+          balance: 1000,
           liquidity_pool_id: pool1.id,
           datetime: new Date("2022-05-20"),
         },
         {
-          balance: 5,
+          balance: 500,
           liquidity_pool_id: pool1.id,
           datetime: new Date("2022-05-19"),
         },
         {
-          balance: 25,
+          balance: 2500,
           liquidity_pool_id: pool2.id,
           datetime: new Date("2022-05-19"),
         },
       ]);
 
-      expect(await totalValueLockedInPools([collaterToken1])).to.equal("10");
+      expect(await totalValueLockedInPools([collaterToken1])).to.equal(10);
     });
 
     it("safely returns 0 if there are no pools for the specified collateral tokens", async () => {
@@ -104,22 +104,22 @@ describe("Total Value Locked Computed Metrics", () => {
     it("returns the sum of tbc balances by day for the given collateral tokens", async () => {
       await knex<LiquidityPoolBalance>("liquidity_pool_balances").insert([
         {
-          balance: 10,
+          balance: 1000,
           liquidity_pool_id: pool1.id,
           datetime: new Date("2022-05-20"),
         },
         {
-          balance: 5,
+          balance: 500,
           liquidity_pool_id: pool1.id,
           datetime: new Date("2022-05-19"),
         },
         {
-          balance: 25,
+          balance: 2500,
           liquidity_pool_id: pool2.id,
           datetime: new Date("2022-05-19"),
         },
         {
-          balance: 35,
+          balance: 3500,
           liquidity_pool_id: pool2.id,
           datetime: new Date("2022-05-20"),
         },
@@ -133,22 +133,22 @@ describe("Total Value Locked Computed Metrics", () => {
     it("can ignore balances for collateral tokens we don't care about ", async () => {
       await knex<LiquidityPoolBalance>("liquidity_pool_balances").insert([
         {
-          balance: 10,
+          balance: 1000,
           liquidity_pool_id: pool1.id,
           datetime: new Date("2022-05-20"),
         },
         {
-          balance: 5,
+          balance: 500,
           liquidity_pool_id: pool1.id,
           datetime: new Date("2022-05-19"),
         },
         {
-          balance: 25,
+          balance: 2500,
           liquidity_pool_id: pool2.id,
           datetime: new Date("2022-05-19"),
         },
         {
-          balance: 35,
+          balance: 3500,
           liquidity_pool_id: pool2.id,
           datetime: new Date("2022-05-20"),
         },
