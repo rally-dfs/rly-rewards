@@ -118,7 +118,7 @@ routes.get("/", async (_req, res) => {
 
       // {datetime (as iso string): {tracked_token_account_id: balance}}
       const balancesByDate: {
-        [key: string]: { [key: string]: number };
+        [key: string]: { [key: string]: string };
       } = {};
       let previousDate = undefined;
       let currentDate = tokenAccountBalances[0]!.datetime;
@@ -159,7 +159,7 @@ routes.get("/", async (_req, res) => {
         (entry) => {
           const dateString = entry[0];
           const nonZeroCount = Object.values(entry[1]).filter(
-            (balance) => balance > 0
+            (balance) => parseInt(balance) > 0
           ).length;
           return [dateString, nonZeroCount];
         }

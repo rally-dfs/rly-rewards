@@ -1,9 +1,14 @@
 import { getKnex } from "./database";
-import { getAllTrackedTokenAccountInfoAndTransactions } from "./chain-data-utils/combined_queries";
+import {
+  getAllSolanaTrackedTokenAccountInfoAndTransactions,
+  TrackedTokenAccountInfo,
+} from "./chain-data-utils/combined_queries";
 import { TrackedTokenAccount } from "./knex-types/tracked_token_account";
 import { TrackedTokenAccountBalance } from "./knex-types/tracked_token_account_balance";
 import { TrackedTokenAccountTransaction } from "./knex-types/tracked_token_account_transaction";
 import { TrackedTokenAccountBalanceChange } from "./knex-types/tracked_token_account_balance_change";
+import { TrackedTokenChain } from "./knex-types/tracked_token";
+import { getAllEthTokenAddressInfoAndTransactions } from "./chain-data-utils/bitquery";
 
 /** Calls getAllTrackedTokenAccountInfoAndTransactions for all token accounts from `previously fetched end date + 24 hours`
  * (inclusive) to `end date` (exclusive).
@@ -29,6 +34,7 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
     token_id: number;
     mint_address: string;
     decimals: number;
+    chain: TrackedTokenChain;
     account_id: number;
     account_address: string;
   }[] = await knex("tracked_tokens")
@@ -41,16 +47,18 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
       "tracked_tokens.id as token_id",
       "tracked_tokens.mint_address",
       "tracked_tokens.decimals",
+      "tracked_tokens.chain",
       "tracked_token_accounts.id as account_id",
       "tracked_token_accounts.address as account_address"
     );
 
-  // {token_id: {address: "...", decimals: 9, accountIdsByAddress: {account_address: account_id}}}
+  // {token_id: {address: "...", decimals: 9, chain: "solana", accountIdsByAddress: {account_address: account_id}}}
   // make a dictionary to quickly look up info by mint and account PKs for below
   let tokenAccountsByToken: {
     [key: string]: {
       mint_address: string;
       decimals: number;
+      chain: TrackedTokenChain;
       accountIdsByAddress: { [key: string]: string };
     };
   } = {};
@@ -59,6 +67,7 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
       tokenAccountsByToken[account.token_id] = {
         mint_address: account.mint_address,
         decimals: account.decimals,
+        chain: account.chain,
         accountIdsByAddress: {},
       };
     }
@@ -75,7 +84,7 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
 
   const mostRecentBalances: {
     tracked_token_account_id: number;
-    approximate_minimum_balance: number;
+    approximate_minimum_balance: string;
     datetime: Date;
     token_id: number;
   }[] = await knex("tracked_token_account_balances")
@@ -100,7 +109,7 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
   // {token_id: {date_string: {account_id: balance}}}
   const balancesByDateByTokenId: {
     [key: string]: {
-      [key: string]: { [key: string]: number };
+      [key: string]: { [key: string]: string };
     };
   } = {};
   mostRecentBalances.forEach((balance) => {
@@ -123,6 +132,7 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
     const tokenId = allTrackedTokenIds[i]!;
     const mintAddress = tokenAccountsByToken[tokenId]!.mint_address;
     const decimals = tokenAccountsByToken[tokenId]!.decimals;
+    const chain = tokenAccountsByToken[tokenId]!.chain;
     const accountIdsByAddress =
       tokenAccountsByToken[tokenId]!.accountIdsByAddress!;
 
@@ -159,11 +169,14 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
     let currentEndDate =
       maxDatePlusOne && !forceOneDay ? maxDatePlusOne : lastEndDate;
 
+    console.log(`Fetching tracked token data for ${tokenId} ${mintAddress}`);
+
     while (currentEndDate <= lastEndDate) {
       await _getTrackedTokenAccountInfoForMintAndEndDate(
         tokenId,
         mintAddress,
         decimals,
+        chain,
         accountIdsByAddress,
         balancesByDate,
         currentEndDate
@@ -181,6 +194,7 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
  * @param tokenId
  * @param mintAddress
  * @param decimals
+ * @param chain
  * @param accountIdsByAddress Dictionary of {account_address: db_id}. Will be updated with any new accounts fetched and
  * inserted into the DB during this run (needed for future calls of this function)
  * @param balancesByDate Dictionary of {date: {account_id: balance}}. Will be updated with `endDateExclusive`'s
@@ -191,8 +205,9 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
   tokenId: string,
   mintAddress: string,
   decimals: number,
+  chain: TrackedTokenChain,
   accountIdsByAddress: { [key: string]: string },
-  balancesByDate: { [key: string]: { [key: string]: number } },
+  balancesByDate: { [key: string]: { [key: string]: string } },
   endDateExclusive: Date
 ) {
   const knex = getKnex();
@@ -205,12 +220,25 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
     endDateExclusive.valueOf() - 24 * 3600 * 1000
   );
 
-  const accountInfos = await getAllTrackedTokenAccountInfoAndTransactions(
-    mintAddress,
-    decimals,
-    startDateInclusive,
-    endDateExclusive
-  );
+  let accountInfos: TrackedTokenAccountInfo[];
+  if (chain === "solana") {
+    accountInfos = await getAllSolanaTrackedTokenAccountInfoAndTransactions(
+      mintAddress,
+      decimals,
+      startDateInclusive,
+      endDateExclusive
+    );
+  } else if (chain === "ethereum") {
+    accountInfos = await getAllEthTokenAddressInfoAndTransactions(
+      mintAddress,
+      decimals,
+      startDateInclusive,
+      endDateExclusive
+    );
+  } else {
+    console.error(`Invalid chain set for tracked token ${tokenId}: ${chain}`);
+    return;
+  }
 
   if (accountInfos.length > 0) {
     // first insert any new TrackedTokenAccounts
@@ -231,7 +259,7 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
           tokenAccounts.slice(i, i + chunkSize),
           "*" // need this for postgres to return the added result
         )
-        .onConflict(["address"])
+        .onConflict(["address", "token_id"])
         // update first_transaction_date if endDateExclusive is further in the past (i.e. if we called this for a date
         // backwards in time than the existing data)
         .merge({ first_transaction_date: endDateExclusive })
@@ -375,13 +403,17 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
           incomingTransactionRows.slice(i, i + chunkSize),
           "*" // need this for postgres to return the added result
         )
-        .onConflict(["tracked_token_account_id", "transaction_hash"])
+        .onConflict([
+          "tracked_token_account_id",
+          "transaction_hash",
+          "transfer_in",
+        ])
         .ignore(); // can just ignore if we already have this account saved
     }
   }
 
   if (outgoingTransactionRows.length > 0) {
-    for (let i = 0; i < incomingTransactionRows.length; i += chunkSize) {
+    for (let i = 0; i < outgoingTransactionRows.length; i += chunkSize) {
       await knex<TrackedTokenAccountTransaction>(
         "tracked_token_account_transactions"
       )
@@ -389,7 +421,11 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
           outgoingTransactionRows.slice(i, i + chunkSize),
           "*" // need this for postgres to return the added result
         )
-        .onConflict(["tracked_token_account_id", "transaction_hash"])
+        .onConflict([
+          "tracked_token_account_id",
+          "transaction_hash",
+          "transfer_in",
+        ])
         .ignore(); // can just ignore if we already have this account saved
     }
   }

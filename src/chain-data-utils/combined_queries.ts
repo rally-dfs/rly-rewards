@@ -190,7 +190,7 @@ export type TrackedTokenAccountInfo = {
   tokenAccountAddress: string;
   ownerAccountAddress?: string;
   // see note in TrackedTokenAccountBalance.approximate_minimum_balance on this
-  approximateMinimumBalance?: number;
+  approximateMinimumBalance?: string;
   incomingTransactions: Set<string>;
   outgoingTransactions: Set<string>;
 };
@@ -203,7 +203,7 @@ export type TrackedTokenAccountInfo = {
  * @param startDateInclusive
  * @param endDateExclusive
  */
-export async function getAllTrackedTokenAccountInfoAndTransactions(
+export async function getAllSolanaTrackedTokenAccountInfoAndTransactions(
   tokenMintAddress: string,
   tokenMintDecimals: number,
   startDateInclusive: Date,
@@ -257,7 +257,7 @@ export async function getAllTrackedTokenAccountInfoAndTransactions(
       ownerAccountAddress: bqAccountInfo.ownerAccountAddress,
       approximateMinimumBalance: approximateMinimumBalance
         ? // make sure to round this to an int, sometimes the APIs return weird values more than 9 decimals
-          Math.round(approximateMinimumBalance)
+          Math.round(approximateMinimumBalance).toString()
         : undefined,
       incomingTransactions: bqAccountInfo.incomingTransactions,
       outgoingTransactions: bqAccountInfo.outgoingTransactions,
