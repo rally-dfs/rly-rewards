@@ -7,6 +7,8 @@ import { TrackedTokenAccountBalance } from "./knex-types/tracked_token_account_b
 import { TrackedToken } from "./knex-types/tracked_token";
 import { LiquidityCollateralToken } from "./knex-types/liquidity_collateral_token";
 import {
+  totalActiveWallets,
+  totalActiveWalletsByDay,
   totalWallets,
   totalWalletsByDay,
 } from "./computed_metrics/wallet_metrics";
@@ -208,6 +210,8 @@ routes.get("/vanity_metrics", async (_req, res) => {
     transactionsByDayData,
     tvl,
     tvlByDay,
+    activeWalletsTotal,
+    activeWalletsByDay,
   ] = await Promise.all([
     totalWallets(allTrackedTokens),
     totalWalletsByDay(allTrackedTokens),
@@ -215,12 +219,16 @@ routes.get("/vanity_metrics", async (_req, res) => {
     transactionsByDay(allTrackedTokens),
     totalValueLockedInPools(allLiquidityCollateralTokens),
     valueLockedByDay(allLiquidityCollateralTokens),
+    totalActiveWallets(allTrackedTokens),
+    totalActiveWalletsByDay(allTrackedTokens),
   ]);
 
   res.json({
     totalTokensTracked: allTrackedTokens.length,
     totalWallets: totalWalletCount,
     walletsByDay: walletByDayData,
+    activeWalletsByDay: activeWalletsByDay,
+    totalActiveWallets: activeWalletsTotal,
     totalTransactions: transactionCount,
     transactionsByDay: transactionsByDayData,
     tvl: tvl,

@@ -28,6 +28,8 @@ describe("GET /vanity_metrics", () => {
       totalTokensTracked: 0,
       totalWallets: "0",
       walletsByDay: [],
+      totalActiveWallets: "0",
+      activeWalletsByDay: [],
       totalTransactions: 0,
       transactionsByDay: [],
       tvl: 0,
