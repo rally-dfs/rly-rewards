@@ -2,6 +2,7 @@ import { expect } from "chai";
 import { getKnex } from "../../src/database";
 import { TrackedToken } from "../../src/knex-types/tracked_token";
 import {
+  totalActiveWallets,
   totalActiveWalletsByDay,
   totalWallets,
   totalWalletsByDay,
@@ -233,7 +234,7 @@ describe("Computed Wallet Metrics", () => {
     });
   });
 
-  describe("#totalActiveWallets", () => {
+  describe("#totalActiveWalletsByDay", () => {
     it("returns a day by day count of wallets that have sent an outbound transaction for the tokens we asked about", async () => {
       const account1 = await createAccount(
         trackedToken,
@@ -292,6 +293,76 @@ describe("Computed Wallet Metrics", () => {
           activeWalletCount: 1,
         },
       ]);
+    });
+  });
+
+  describe("#totalActiveWallets", () => {
+    it("returns a day by day count of wallets that have sent an outbound transaction for the tokens we asked about", async () => {
+      const account1 = await createAccount(
+        trackedToken,
+        new Date("2022-05-20")
+      );
+      const account2 = await createAccount(
+        trackedToken,
+        new Date("2022-05-21")
+      );
+
+      const account3 = await createAccount(
+        trackedToken,
+        new Date("2022-05-20")
+      );
+
+      const account4 = await createAccount(
+        trackedToken,
+        new Date("2022-05-20")
+      );
+
+      await knex("tracked_token_account_transactions").insert([
+        {
+          tracked_token_account_id: account1.id,
+          datetime: new Date("2022-05-20"),
+          transaction_hash: "some_fake_hash_1",
+          transfer_in: false,
+        },
+        {
+          tracked_token_account_id: account1.id,
+          datetime: new Date("2022-05-20"),
+          transaction_hash: "second transaction for same account",
+          transfer_in: false,
+        },
+        {
+          tracked_token_account_id: account2.id,
+          datetime: new Date("2022-05-20"),
+          transaction_hash: "some_fake_hash_2",
+          transfer_in: false,
+        },
+        {
+          tracked_token_account_id: account3.id,
+          datetime: new Date("2022-05-20"),
+          transaction_hash: "some_fake_hash_3",
+          transfer_in: true,
+        },
+        {
+          tracked_token_account_id: account4.id,
+          datetime: new Date("2022-05-20"),
+          transaction_hash: "transfer_in_hash_1",
+          transfer_in: true,
+        },
+        {
+          tracked_token_account_id: account3.id,
+          datetime: new Date("2022-05-21"),
+          transaction_hash: "some_fake_hash_4",
+          transfer_in: false,
+        },
+        {
+          tracked_token_account_id: account4.id,
+          datetime: new Date("2022-05-21"),
+          transaction_hash: "some_fake_hash_5",
+          transfer_in: true,
+        },
+      ]);
+
+      expect(await totalActiveWallets([trackedToken])).to.eql("3");
     });
   });
 });

@@ -63,3 +63,15 @@ export async function totalActiveWalletsByDay(trackedTokens: TrackedToken[]) {
     activeWalletCount: parseInt(record.count),
   }));
 }
+
+export async function totalActiveWallets(trackedTokens: TrackedToken[]) {
+  const startDateFilter = new Date(0);
+  const dbResponse: { count: string }[] = await knex
+    .from("tracked_token_account_transactions")
+    .countDistinct("tracked_token_account_id")
+    .where("datetime", ">=", startDateFilter)
+    .whereIn("tracked_token_account_id", accountIdsForTokens(trackedTokens))
+    .where("transfer_in", false);
+
+  return dbResponse[0]?.count;
+}
