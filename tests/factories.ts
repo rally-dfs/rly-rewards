@@ -18,7 +18,7 @@ export async function createTrackedToken(displayName: string, address: string) {
     throw new Error("Unable to initialize token mint");
   }
 
-  return mintedTokens[0];
+  return mintedTokens[0]!;
 }
 
 export async function createAccount(
@@ -40,7 +40,7 @@ export async function createAccount(
   if (dbResponse.length < 1) {
     throw new Error("Unable to create account");
   }
-  return dbResponse[0];
+  return dbResponse[0]!;
 }
 
 export async function createLiquidityCollateralToken(displayName: string) {
@@ -58,5 +58,5 @@ export async function createLiquidityCollateralToken(displayName: string) {
   if (dbResponse.length < 1) {
     throw new Error("Unable to create liquidity collateral token");
   }
-  return dbResponse[0];
+  return dbResponse[0]!;
 }
