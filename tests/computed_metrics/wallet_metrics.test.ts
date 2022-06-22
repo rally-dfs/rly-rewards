@@ -253,31 +253,31 @@ describe("Computed Wallet Metrics", () => {
       await knex("tracked_token_account_transactions").insert([
         {
           tracked_token_account_id: account1.id,
-          datetime: new Date("2022-05-20"),
+          datetime: new Date("2022-05-20T00:00:00Z"),
           transaction_hash: "some_fake_hash_1",
           transfer_in: false,
         },
         {
           tracked_token_account_id: account1.id,
-          datetime: new Date("2022-05-20"),
+          datetime: new Date("2022-05-20T01:30:00Z"),
           transaction_hash: "second transaction for same account",
           transfer_in: false,
         },
         {
           tracked_token_account_id: account2.id,
-          datetime: new Date("2022-05-20"),
+          datetime: new Date("2022-05-20T02:22:00Z"),
           transaction_hash: "some_fake_hash_2",
           transfer_in: false,
         },
         {
           tracked_token_account_id: account3.id,
-          datetime: new Date("2022-05-20"),
+          datetime: new Date("2022-05-20T01:00:00Z"),
           transaction_hash: "some_fake_hash_3",
           transfer_in: true,
         },
         {
           tracked_token_account_id: account3.id,
-          datetime: new Date("2022-05-21"),
+          datetime: new Date("2022-05-21T03:22:00Z"),
           transaction_hash: "some_fake_hash_4",
           transfer_in: false,
         },
@@ -285,11 +285,11 @@ describe("Computed Wallet Metrics", () => {
 
       expect(await totalActiveWalletsByDay([trackedToken])).to.eql([
         {
-          date: "2022-05-19T07:00:00.000Z",
+          date: "2022-05-20",
           activeWalletCount: 2,
         },
         {
-          date: "2022-05-20T07:00:00.000Z",
+          date: "2022-05-21",
           activeWalletCount: 1,
         },
       ]);
@@ -320,43 +320,43 @@ describe("Computed Wallet Metrics", () => {
       await knex("tracked_token_account_transactions").insert([
         {
           tracked_token_account_id: account1.id,
-          datetime: new Date("2022-05-20"),
+          datetime: new Date("2022-05-20T00:00:00Z"),
           transaction_hash: "some_fake_hash_1",
           transfer_in: false,
         },
         {
           tracked_token_account_id: account1.id,
-          datetime: new Date("2022-05-20"),
+          datetime: new Date("2022-05-20T00:00:00Z"),
           transaction_hash: "second transaction for same account",
           transfer_in: false,
         },
         {
           tracked_token_account_id: account2.id,
-          datetime: new Date("2022-05-20"),
+          datetime: new Date("2022-05-20T00:00:00Z"),
           transaction_hash: "some_fake_hash_2",
           transfer_in: false,
         },
         {
           tracked_token_account_id: account3.id,
-          datetime: new Date("2022-05-20"),
+          datetime: new Date("2022-05-20T00:00:00Z"),
           transaction_hash: "some_fake_hash_3",
           transfer_in: true,
         },
         {
           tracked_token_account_id: account4.id,
-          datetime: new Date("2022-05-20"),
+          datetime: new Date("2022-05-20T00:00:00Z"),
           transaction_hash: "transfer_in_hash_1",
           transfer_in: true,
         },
         {
           tracked_token_account_id: account3.id,
-          datetime: new Date("2022-05-21"),
+          datetime: new Date("2022-05-21T00:00:00Z"),
           transaction_hash: "some_fake_hash_4",
           transfer_in: false,
         },
         {
           tracked_token_account_id: account4.id,
-          datetime: new Date("2022-05-21"),
+          datetime: new Date("2022-05-21T00:00:00Z"),
           transaction_hash: "some_fake_hash_5",
           transfer_in: true,
         },
