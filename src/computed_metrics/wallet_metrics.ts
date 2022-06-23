@@ -25,7 +25,7 @@ export async function totalWallets(
     return -1;
   }
 
-  return result[0]?.count;
+  return parseInt(result[0]?.count);
 }
 
 export async function totalWalletsByDay(trackedTokens: TrackedToken[]) {
@@ -83,5 +83,5 @@ export async function totalActiveWallets(trackedTokens: TrackedToken[]) {
     .whereIn("tracked_token_account_id", accountIdsForTokens(trackedTokens))
     .where("transfer_in", false);
 
-  return dbResponse[0]?.count;
+  return parseInt(dbResponse[0]?.count!);
 }

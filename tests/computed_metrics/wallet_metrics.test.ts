@@ -40,7 +40,7 @@ describe("Computed Wallet Metrics", () => {
         },
       ]);
 
-      expect(await totalWallets([trackedToken])).to.equal("2");
+      expect(await totalWallets([trackedToken])).to.equal(2);
     });
 
     it("supports combining wallet counts for multiple supplied tokens of interest", async () => {
@@ -68,7 +68,7 @@ describe("Computed Wallet Metrics", () => {
         },
       ]);
 
-      expect(await totalWallets([trackedToken, trackedToken2])).to.equal("2");
+      expect(await totalWallets([trackedToken, trackedToken2])).to.equal(2);
     });
 
     it("filters out 0 balance wallets when passed function option flag", async () => {
@@ -98,7 +98,7 @@ describe("Computed Wallet Metrics", () => {
         await totalWallets([trackedToken], {
           removeEmptyWallets: true,
         })
-      ).to.equal("1");
+      ).to.equal(1);
     });
 
     it("does not include the same wallet address more than once per token type", async () => {
@@ -120,7 +120,7 @@ describe("Computed Wallet Metrics", () => {
         },
       ]);
 
-      expect(await totalWallets([trackedToken])).to.equal("1");
+      expect(await totalWallets([trackedToken])).to.equal(1);
     });
 
     it("supports removing balances that existed prior to a given optional start date", async () => {
@@ -150,7 +150,7 @@ describe("Computed Wallet Metrics", () => {
         await totalWallets([trackedToken], {
           startDate: new Date("2022-05-21"),
         })
-      ).to.equal("1");
+      ).to.equal(1);
     });
   });
 
@@ -362,7 +362,7 @@ describe("Computed Wallet Metrics", () => {
         },
       ]);
 
-      expect(await totalActiveWallets([trackedToken])).to.eql("3");
+      expect(await totalActiveWallets([trackedToken])).to.eql(3);
     });
   });
 });
