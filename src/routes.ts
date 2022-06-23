@@ -3,8 +3,6 @@ import { getKnex } from "./database";
 import { TrackedToken } from "./knex-types/tracked_token";
 import { LiquidityCollateralToken } from "./knex-types/liquidity_collateral_token";
 import {
-  totalActiveWallets,
-  totalActiveWalletsByDay,
   totalWallets,
   totalWalletsByDay,
 } from "./computed_metrics/wallet_metrics";
@@ -41,8 +39,6 @@ routes.get("/vanity_metrics", async (_req, res) => {
     transactionsByDayData,
     tvl,
     tvlByDay,
-    activeWalletsTotal,
-    activeWalletsByDay,
   ] = await Promise.all([
     totalWallets(allTrackedTokens),
     totalWalletsByDay(allTrackedTokens),
@@ -50,8 +46,6 @@ routes.get("/vanity_metrics", async (_req, res) => {
     transactionsByDay(allTrackedTokens),
     totalValueLockedInPools(allLiquidityCollateralTokens),
     valueLockedByDay(allLiquidityCollateralTokens),
-    totalActiveWallets(allTrackedTokens),
-    totalActiveWalletsByDay(allTrackedTokens),
   ]);
 
   // add the hardcoded metrics for vanity only
@@ -64,8 +58,6 @@ routes.get("/vanity_metrics", async (_req, res) => {
     totalTokensTracked: allTrackedTokens.length,
     totalWallets: totalWalletCount,
     walletsByDay: walletByDayData,
-    activeWalletsByDay: activeWalletsByDay,
-    totalActiveWallets: activeWalletsTotal,
     totalTransactions: totalTransactionCount,
     transactionsByDay: transactionsByDayData,
     tvl: tvl,
