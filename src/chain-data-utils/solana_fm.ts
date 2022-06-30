@@ -171,11 +171,8 @@ export async function latestAccountInputsOnDateSolanaFm(
 export type SolanaFMTrackedTokenAccountInfo = {
   tokenAccountAddress: string;
   balance: number;
-  incomingTransactions: Set<string>;
-  outgoingTransactions: Set<string>;
-  // subOneTransactions should be used in conjunction with bitquery results (which have full precision) to tell
-  // whether it's incoming, outgoing, or zero (and should be discarded)
-  subOneTransactions: Set<string>;
+  // we don't use transactions from solana.fm because they're too buggy (see note in
+  // combined_queries.getAllSolanaTrackedTokenAccountInfoAndTransactions)
 };
 
 // Queries solana.fm account-inputs for all token accounts belonging to `tokenMintAddress` with any activity between
@@ -239,40 +236,10 @@ export async function tokenAccountsInfoBetweenDatesSolanaFm(
         accountInfoMap[result.account] = {
           tokenAccountAddress: result.account,
           balance: 0,
-          incomingTransactions: new Set<string>(),
-          outgoingTransactions: new Set<string>(),
-          subOneTransactions: new Set<string>(),
         };
       }
 
       accountInfoMap[result.account]!.balance = result.postBalance;
-
-      if (result.postBalance == result.preBalance) {
-        // this might be a 0 transaction or just one with 0 < amount < 1, the caller should cross reference these with
-        // bitquery's results to determine whether it's incoming/outgoing or should be discarded
-        accountInfoMap[result.account]!.subOneTransactions.add(
-          result.transactionHash
-        );
-      } else if (result.preBalance === 0 && result.postBalance === -1) {
-        // CloseAccount txns seems to show up as a `0 -> -1` transfer, so treat these similarly and defer to
-        // bitquery about whether we care about them or not (we could go either way on whether to include these, but
-        // given sfm is a lot flakier it's good to match bitquery's results, and the previous non-zero -> 0 txn would
-        // already be captured in another txn so we aren't really missing any substantial transfer)
-        // note that sometimes, sfm does have `non-zero -> -1` transfers (probably due to rounding), so it's not enough
-        // to only check postBalance == -1, we must also check preBalance == 0
-        // (e.g. 55JVfbghMEGAkTo1tCqYByJfgVm9n4g72XEa131sicxw4c32PZEp1MCZGT1Sx2JBNAoE8MurcG2f2n9wU5sg3tLA)
-        accountInfoMap[result.account]!.subOneTransactions.add(
-          result.transactionHash
-        );
-      } else if (result.postBalance > result.preBalance) {
-        accountInfoMap[result.account]!.incomingTransactions.add(
-          result.transactionHash
-        );
-      } else {
-        accountInfoMap[result.account]!.outgoingTransactions.add(
-          result.transactionHash
-        );
-      }
     });
 
   console.log(results.length, " results");

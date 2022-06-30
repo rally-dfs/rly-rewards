@@ -368,26 +368,28 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
 
   filteredAccountInfos.forEach((accountInfo) => {
     incomingTransactionRows.push(
-      ...[...accountInfo.incomingTransactions].map((hash) => {
+      ...Object.values(accountInfo.incomingTransactions).map((txn) => {
         return {
           tracked_token_account_id: parseInt(
             accountIdsByAddress[accountInfo.tokenAccountAddress]!
           ),
           datetime: endDateExclusive,
-          transaction_hash: hash!,
+          transaction_datetime: txn.transaction_datetime,
+          transaction_hash: txn.hash,
           transfer_in: true,
         };
       })
     );
 
     outgoingTransactionRows.push(
-      ...[...accountInfo.outgoingTransactions].map((hash) => {
+      ...Object.values(accountInfo.outgoingTransactions).map((txn) => {
         return {
           tracked_token_account_id: parseInt(
             accountIdsByAddress[accountInfo.tokenAccountAddress]!
           ),
           datetime: endDateExclusive,
-          transaction_hash: hash!,
+          transaction_datetime: txn.transaction_datetime,
+          transaction_hash: txn.hash,
           transfer_in: false,
         };
       })

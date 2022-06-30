@@ -186,13 +186,18 @@ export async function getDailyTokenBalancesBetweenDates(
   return allBalances;
 }
 
+export type TrackedTokenAccountInfoTransaction = {
+  hash: string;
+  transaction_datetime: Date;
+};
+
 export type TrackedTokenAccountInfo = {
   tokenAccountAddress: string;
   ownerAccountAddress?: string;
   // see note in TrackedTokenAccountBalance.approximate_minimum_balance on this
   approximateMinimumBalance?: string;
-  incomingTransactions: Set<string>;
-  outgoingTransactions: Set<string>;
+  incomingTransactions: { [key: string]: TrackedTokenAccountInfoTransaction };
+  outgoingTransactions: { [key: string]: TrackedTokenAccountInfoTransaction };
 };
 
 /** Calls both bitquery and solana.fm versions of getAllTrackedTokenAccountInfo for tokenMintAddress from

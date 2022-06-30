@@ -1,4 +1,7 @@
-import { TrackedTokenAccountInfo } from "./combined_queries";
+import {
+  TrackedTokenAccountInfo,
+  TrackedTokenAccountInfoTransaction,
+} from "./combined_queries";
 import { getERC20BalancesForAddressesAtBlocks } from "./ethereum";
 import { queryGQL } from "./graphql";
 
@@ -66,6 +69,7 @@ type BitquerySolanaTransfer = {
   transaction: BitquerySolanaTransaction;
   sender: BitquerySolanaTransferAccount;
   receiver: BitquerySolanaTransferAccount;
+  block: { timestamp: { iso8601: Date } };
 };
 type BitquerySolanaTransaction = {
   signature: string;
@@ -118,6 +122,7 @@ async function _solanaTransferAmountsWithFilter(
         options: {limit: $limit, offset: $offset}
         time: {between: [$startTime, $endTime]}
         currency: {is: $tokenMintAddress}
+        success: {is: true}
         ${tokenAccountOwnerFilterString}
       ) {
         amount
@@ -135,6 +140,11 @@ async function _solanaTransferAmountsWithFilter(
           address
           mintAccount
           type
+        }
+        block {
+          timestamp {
+            iso8601
+          }
         }
       }
     }
@@ -214,8 +224,8 @@ export type BitquerySolanaTrackedTokenAccountInfo = {
   tokenAccountAddress: string;
   ownerAccountAddress?: string;
   balanceChange: number;
-  incomingTransactions: Set<string>;
-  outgoingTransactions: Set<string>;
+  incomingTransactions: { [key: string]: TrackedTokenAccountInfoTransaction };
+  outgoingTransactions: { [key: string]: TrackedTokenAccountInfoTransaction };
 };
 
 // Queries bitquery solana.transfers for all token accounts belonging to `tokenMintAddress` with any activity between
@@ -258,8 +268,8 @@ export async function solanaTrackedTokenAccountsInfoBetweenDatesBitquery(
         tokenAccountAddress: result.sender.mintAccount,
         ownerAccountAddress: result.sender.address,
         balanceChange: 0,
-        incomingTransactions: new Set<string>(),
-        outgoingTransactions: new Set<string>(),
+        incomingTransactions: {},
+        outgoingTransactions: {},
       };
     }
 
@@ -268,20 +278,26 @@ export async function solanaTrackedTokenAccountsInfoBetweenDatesBitquery(
         tokenAccountAddress: result.receiver.mintAccount,
         ownerAccountAddress: result.receiver.address,
         balanceChange: 0,
-        incomingTransactions: new Set<string>(),
-        outgoingTransactions: new Set<string>(),
+        incomingTransactions: {},
+        outgoingTransactions: {},
       };
     }
 
     accountInfoMap[result.sender.mintAccount]!.balanceChange -= result.amount;
     accountInfoMap[result.receiver.mintAccount]!.balanceChange += result.amount;
 
-    accountInfoMap[result.sender.mintAccount]!.outgoingTransactions.add(
+    accountInfoMap[result.sender.mintAccount]!.outgoingTransactions[
       result.transaction.signature
-    );
-    accountInfoMap[result.receiver.mintAccount]!.incomingTransactions.add(
+    ] = {
+      hash: result.transaction.signature,
+      transaction_datetime: result.block.timestamp.iso8601,
+    };
+    accountInfoMap[result.receiver.mintAccount]!.incomingTransactions[
       result.transaction.signature
-    );
+    ] = {
+      hash: result.transaction.signature,
+      transaction_datetime: result.block.timestamp.iso8601,
+    };
   });
 
   console.log(results.length, " results");
@@ -454,8 +470,8 @@ export async function getAllEthTokenAddressInfoAndTransactions(
       accountInfoMap[result.sender.address] = {
         tokenAccountAddress: result.sender.address,
         approximateMinimumBalance: addressToBalances[result.sender.address],
-        incomingTransactions: new Set<string>(),
-        outgoingTransactions: new Set<string>(),
+        incomingTransactions: {},
+        outgoingTransactions: {},
       };
     }
 
@@ -463,17 +479,23 @@ export async function getAllEthTokenAddressInfoAndTransactions(
       accountInfoMap[result.receiver.address] = {
         tokenAccountAddress: result.receiver.address,
         approximateMinimumBalance: addressToBalances[result.receiver.address],
-        incomingTransactions: new Set<string>(),
-        outgoingTransactions: new Set<string>(),
+        incomingTransactions: {},
+        outgoingTransactions: {},
       };
     }
 
-    accountInfoMap[result.sender.address]!.outgoingTransactions.add(
+    accountInfoMap[result.sender.address]!.outgoingTransactions[
       result.transaction.hash
-    );
-    accountInfoMap[result.receiver.address]!.incomingTransactions.add(
+    ] = {
+      hash: result.transaction.hash,
+      transaction_datetime: result.block.timestamp.iso8601,
+    };
+    accountInfoMap[result.receiver.address]!.incomingTransactions[
       result.transaction.hash
-    );
+    ] = {
+      hash: result.transaction.hash,
+      transaction_datetime: result.block.timestamp.iso8601,
+    };
   });
 
   console.log(results.length, " results");
