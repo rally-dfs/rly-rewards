@@ -4,6 +4,10 @@ import {
 } from "./combined_queries";
 import { getERC20BalancesForAddressesAtBlocks } from "./ethereum";
 import { queryGQL } from "./graphql";
+import {
+  BITQUERY_FETCH_ALL_PAGES_PAGE_LIMIT,
+  BITQUERY_TIMEOUT_BETWEEN_CALLS,
+} from "./constants";
 
 async function _queryBitqueryGQL(queryString: string, variables?: object) {
   let headers = [
@@ -18,9 +22,6 @@ async function _queryBitqueryGQL(queryString: string, variables?: object) {
   );
 }
 
-// wait 10 seconds between API calls (this can probably be reduced if we pay for a better plan)
-const TIMEOUT_BETWEEN_CALLS = 10000;
-
 /** Helper to handle getting all pages of results (with rate limiting built in)
  *
  * @param queryString graphql query as a string. Must include `limit` and `offset` as inputs
@@ -33,7 +34,7 @@ async function _fetchAllPagesWithQueryAndVariables<T>(
   variables: any,
   dataPath: (data: any) => Array<T>
 ) {
-  const pageLimit = 2500;
+  const pageLimit = BITQUERY_FETCH_ALL_PAGES_PAGE_LIMIT();
   const maxOffset = pageLimit * 1000000; // infinite loop protection
 
   let allTransfers: Array<T> = [];
@@ -57,7 +58,7 @@ async function _fetchAllPagesWithQueryAndVariables<T>(
     offset += pageLimit;
 
     // rate limiting here in case we make too many calls
-    await new Promise((f) => setTimeout(f, TIMEOUT_BETWEEN_CALLS));
+    await new Promise((f) => setTimeout(f, BITQUERY_TIMEOUT_BETWEEN_CALLS()));
   }
 
   return allTransfers;
@@ -340,7 +341,7 @@ export async function getSolanaTransactionSuccessForHashesBitquery(
     });
 
     // rate limiting here in case we make too many calls
-    await new Promise((f) => setTimeout(f, TIMEOUT_BETWEEN_CALLS));
+    await new Promise((f) => setTimeout(f, BITQUERY_TIMEOUT_BETWEEN_CALLS()));
   }
 
   return hashToSuccessMap;

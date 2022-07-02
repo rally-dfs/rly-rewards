@@ -14,6 +14,9 @@ const SOL_NETWORK = "mainnet-beta";
 const endpoint = clusterApiUrl(SOL_NETWORK);
 const connection = new Connection(endpoint, "finalized");
 
+// just exported for test mocking, shouldn't be needed in any real code
+export const TEST_MOCK_ONLY_CONNECTION = connection;
+
 /** Calls solana `getTransaction` in a loop and returns the desired accounts' postBalances. `getTransactions` doesn't
  * seem to work on solana RPC due to rate limits but if we switch to a real RPC provider we can probably simplify this
  *
