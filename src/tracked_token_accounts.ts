@@ -293,7 +293,7 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
   // next insert all the TrackedTokenAccountBalances and TrackedTokenAccountBalanceChanges
   const tokenAccountBalanceChangesRows = filteredAccountInfos
     .filter((accountInfo) => {
-      // balance is optional due to solana.fm flakiness so just skip those rows if they don't exist
+      // balance might be missing if something went wrong with on chain fetch, just skip
       return accountInfo.approximateMinimumBalance !== undefined;
     })
     .map((accountInfo) => {
@@ -330,8 +330,6 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
 
   // update with new balances from current day and write that into TrackedTokenAccountBalance
   filteredAccountInfos.forEach((accountInfo) => {
-    // balance is optional due to solana.fm flakiness so just keep previous day's data
-    // TODO: we could improve this by falling back on bitquery's delta_balance data
     if (accountInfo.approximateMinimumBalance !== undefined) {
       currentDayBalances[
         accountIdsByAddress[accountInfo.tokenAccountAddress]!
@@ -376,6 +374,7 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
           datetime: endDateExclusive,
           transaction_datetime: txn.transaction_datetime,
           transaction_hash: txn.hash,
+          amount: txn.amount,
           transfer_in: true,
         };
       })
@@ -390,6 +389,7 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
           datetime: endDateExclusive,
           transaction_datetime: txn.transaction_datetime,
           transaction_hash: txn.hash,
+          amount: txn.amount,
           transfer_in: false,
         };
       })

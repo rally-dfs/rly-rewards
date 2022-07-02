@@ -105,8 +105,7 @@ export async function getDailyTokenBalances(
         new PublicKey(account.collateral_token_account_owner).toString(),
         new PublicKey(account.mint_address).toString(),
         earliestEndDate,
-        latestEndDate,
-        account.decimals
+        latestEndDate
       );
 
       const result = await knex<LiquidityPoolBalance>("liquidity_pool_balances")

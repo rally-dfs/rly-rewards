@@ -64,12 +64,12 @@ async function _fetchAllPagesWithQueryAndVariables<T>(
 }
 
 type BitquerySolanaTransfer = {
-  amount: number;
+  amount: number; // note bitquery returns this as a decimal, e.g. `12.3456` instead of `12345600000` (for 9 decimals)
   transferType: string; // "transfer" "mint" "burn" "self", maybe others?
   transaction: BitquerySolanaTransaction;
   sender: BitquerySolanaTransferAccount;
   receiver: BitquerySolanaTransferAccount;
-  block: { timestamp: { iso8601: Date } };
+  block: { timestamp: { iso8601: string } };
 };
 type BitquerySolanaTransaction = {
   signature: string;
@@ -222,8 +222,7 @@ export async function allSolanaTransfersBetweenDatesBitquery(
 
 export type BitquerySolanaTrackedTokenAccountInfo = {
   tokenAccountAddress: string;
-  ownerAccountAddress?: string;
-  balanceChange: number;
+  ownerAccountAddress: string;
   incomingTransactions: { [key: string]: TrackedTokenAccountInfoTransaction };
   outgoingTransactions: { [key: string]: TrackedTokenAccountInfoTransaction };
 };
@@ -242,6 +241,7 @@ export type BitquerySolanaTrackedTokenAccountInfo = {
 // than the final balance (so this must be combined with some previous call's balance or called multiple times)
 export async function solanaTrackedTokenAccountsInfoBetweenDatesBitquery(
   tokenMintAddress: string,
+  tokenMintDecimals: number,
   startDateInclusive: Date,
   endDateExclusive: Date
 ) {
@@ -267,7 +267,6 @@ export async function solanaTrackedTokenAccountsInfoBetweenDatesBitquery(
       accountInfoMap[result.sender.mintAccount] = {
         tokenAccountAddress: result.sender.mintAccount,
         ownerAccountAddress: result.sender.address,
-        balanceChange: 0,
         incomingTransactions: {},
         outgoingTransactions: {},
       };
@@ -277,26 +276,24 @@ export async function solanaTrackedTokenAccountsInfoBetweenDatesBitquery(
       accountInfoMap[result.receiver.mintAccount] = {
         tokenAccountAddress: result.receiver.mintAccount,
         ownerAccountAddress: result.receiver.address,
-        balanceChange: 0,
         incomingTransactions: {},
         outgoingTransactions: {},
       };
     }
 
-    accountInfoMap[result.sender.mintAccount]!.balanceChange -= result.amount;
-    accountInfoMap[result.receiver.mintAccount]!.balanceChange += result.amount;
-
     accountInfoMap[result.sender.mintAccount]!.outgoingTransactions[
       result.transaction.signature
     ] = {
       hash: result.transaction.signature,
-      transaction_datetime: result.block.timestamp.iso8601,
+      transaction_datetime: new Date(result.block.timestamp.iso8601),
+      amount: (result.amount * 10 ** tokenMintDecimals).toString(),
     };
     accountInfoMap[result.receiver.mintAccount]!.incomingTransactions[
       result.transaction.signature
     ] = {
       hash: result.transaction.signature,
-      transaction_datetime: result.block.timestamp.iso8601,
+      transaction_datetime: new Date(result.block.timestamp.iso8601),
+      amount: (result.amount * 10 ** tokenMintDecimals).toString(),
     };
   });
 
@@ -350,10 +347,12 @@ export async function getSolanaTransactionSuccessForHashesBitquery(
 }
 
 type BitqueryEthereumTransfer = {
+  // note bitquery returns this as a decimal, e.g. `12.3456` instead of `12345600000` (for 9 decimals)
+  amount: number;
   sender: { address: string };
   receiver: { address: string };
   transaction: { hash: string };
-  block: { height: number; timestamp: { iso8601: Date } };
+  block: { height: number; timestamp: { iso8601: string } };
 };
 
 /** Similar to _solanaTransferAmountsWithFilter but for ethereum
@@ -385,6 +384,7 @@ async function _ethereumTransferAmountsWithFilter(
         currency: {is: $tokenMintAddress}
         success: true
       ) {
+        amount
         sender {
           address
         }
@@ -430,7 +430,7 @@ async function _ethereumTransferAmountsWithFilter(
  */
 export async function getAllEthTokenAddressInfoAndTransactions(
   tokenMintAddress: string,
-  _tokenMintDecimals: number,
+  tokenMintDecimals: number,
   startDateInclusive: Date,
   endDateExclusive: Date
 ): Promise<TrackedTokenAccountInfo[]> {
@@ -488,13 +488,15 @@ export async function getAllEthTokenAddressInfoAndTransactions(
       result.transaction.hash
     ] = {
       hash: result.transaction.hash,
-      transaction_datetime: result.block.timestamp.iso8601,
+      transaction_datetime: new Date(result.block.timestamp.iso8601),
+      amount: (result.amount * 10 ** tokenMintDecimals).toString(),
     };
     accountInfoMap[result.receiver.address]!.incomingTransactions[
       result.transaction.hash
     ] = {
       hash: result.transaction.hash,
-      transaction_datetime: result.block.timestamp.iso8601,
+      transaction_datetime: new Date(result.block.timestamp.iso8601),
+      amount: (result.amount * 10 ** tokenMintDecimals).toString(),
     };
   });
 
