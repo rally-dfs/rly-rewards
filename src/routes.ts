@@ -37,7 +37,7 @@ routes.get("/vanity_metrics", async (_req, res) => {
     walletByDayData,
     onchainTransactionCount,
     transactionsByDayData,
-    tvl,
+    onchainTvl,
     tvlByDay,
   ] = await Promise.all([
     totalWallets(allTrackedTokens),
@@ -53,6 +53,7 @@ routes.get("/vanity_metrics", async (_req, res) => {
   const totalWalletCount = onchainWalletCount + offchainData.totalWalletCount;
   const totalTransactionCount =
     onchainTransactionCount + offchainData.totalTransactionCount;
+  const tvl = onchainTvl + offchainData.tvl;
 
   res.json({
     totalTokensTracked: allTrackedTokens.length,

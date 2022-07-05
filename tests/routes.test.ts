@@ -9,7 +9,11 @@ describe("GET /vanity_metrics", () => {
   it("returns a JSON payload of dynamically computed vanity metrics", async () => {
     // ignore hardcoded data for this test
     const offchainStub = stub(offchain_hardcoded, "getOffchainHardcodedData");
-    offchainStub.returns({ totalTransactionCount: 0, totalWalletCount: 0 });
+    offchainStub.returns({
+      totalTransactionCount: 0,
+      totalWalletCount: 0,
+      tvl: 0,
+    });
 
     const response = await request(app).get("/vanity_metrics");
 
@@ -35,11 +39,11 @@ describe("GET /vanity_metrics", () => {
     // secondary check here in the tests
     expect(response.body).to.eql({
       totalTokensTracked: 0,
-      totalWallets: 244_600,
+      totalWallets: 652_610,
       walletsByDay: [],
-      totalTransactions: 14_775_850,
+      totalTransactions: 19_475_850,
       transactionsByDay: [],
-      tvl: 0,
+      tvl: 26_000_000,
       tvlByDay: [],
     });
   });
