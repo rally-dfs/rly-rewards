@@ -68,8 +68,15 @@ export async function getMultipleSolanaTransactionBalances(
     ownerAddresses.forEach((tokenAccountOwnerAddress) => {
       const balances = txnInfo?.meta?.postTokenBalances?.filter(
         (tokenInfo) =>
-          tokenInfo.owner === tokenAccountOwnerAddress &&
-          tokenInfo.mint === tokenMintAddress
+          (tokenInfo.owner === tokenAccountOwnerAddress &&
+            tokenInfo.mint === tokenMintAddress) ||
+          // sometimes bitquery incorrectly returns the token address as the owner instead (think this happens if the
+          // account is closed and rent removed, which messes with their scraping), so we can fall back on
+          // using it as the account address instead and look it up in accountKeys
+          tokenInfo.accountIndex ==
+            txnInfo.transaction.message.accountKeys
+              .map((accountKey) => accountKey.toString())
+              .indexOf(tokenAccountOwnerAddress)
       );
 
       if (!balances || balances.length === 0) {

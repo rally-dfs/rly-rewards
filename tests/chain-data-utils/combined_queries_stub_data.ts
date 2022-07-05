@@ -88,9 +88,11 @@ export const SOLANA_TRANSFERS_PAGE_TWO = {
 // (and suppress the ts error with `any`)
 // txn signature11111, from ownerAAAAA -> ownerBBBBB for 1.111_111_111
 export const SOLANA_GET_TRANSACTION_ONE: any = {
+  transaction: { message: { accountKeys: [] } }, // don't need any content, just need the keys to avoid exception
   meta: {
     postTokenBalances: [
       {
+        accountIndex: 0,
         mint: "tokenmint00000",
         owner: "ownerAAAAA",
         uiTokenAmount: {
@@ -98,6 +100,7 @@ export const SOLANA_GET_TRANSACTION_ONE: any = {
         },
       },
       {
+        accountIndex: 1,
         mint: "tokenmint00000",
         owner: "ownerBBBBB",
         uiTokenAmount: {
@@ -110,9 +113,11 @@ export const SOLANA_GET_TRANSACTION_ONE: any = {
 
 // txn signature22222, from ownerCCCCC -> ownerAAAAA for 2.222_222_222
 export const SOLANA_GET_TRANSACTION_TWO: any = {
+  transaction: { message: { accountKeys: [] } }, // don't need any content, just need the keys to avoid exception
   meta: {
     postTokenBalances: [
       {
+        accountIndex: 0,
         mint: "tokenmint00000",
         owner: "ownerCCCCC",
         uiTokenAmount: {
@@ -120,6 +125,7 @@ export const SOLANA_GET_TRANSACTION_TWO: any = {
         },
       },
       {
+        accountIndex: 1,
         mint: "tokenmint00000",
         owner: "ownerAAAAA",
         uiTokenAmount: {
@@ -132,9 +138,11 @@ export const SOLANA_GET_TRANSACTION_TWO: any = {
 
 // txn signature33333, from ownerBBBBB -> ownerAAAAA for 3.333_333_333
 export const SOLANA_GET_TRANSACTION_THREE: any = {
+  transaction: { message: { accountKeys: [] } }, // don't need any content, just need the keys to avoid exception
   meta: {
     postTokenBalances: [
       {
+        accountIndex: 0,
         mint: "tokenmint00000",
         owner: "ownerBBBBB",
         uiTokenAmount: {
@@ -142,6 +150,7 @@ export const SOLANA_GET_TRANSACTION_THREE: any = {
         },
       },
       {
+        accountIndex: 1,
         mint: "tokenmint00000",
         owner: "ownerAAAAA",
         uiTokenAmount: {
