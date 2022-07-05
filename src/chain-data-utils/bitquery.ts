@@ -1,3 +1,5 @@
+import { BigNumber } from "bignumber.js";
+
 import {
   TrackedTokenAccountInfo,
   TrackedTokenAccountInfoTransaction,
@@ -282,19 +284,21 @@ export async function solanaTrackedTokenAccountsInfoBetweenDatesBitquery(
       };
     }
 
+    const decimalsFactor = new BigNumber(10).pow(tokenMintDecimals);
+
     accountInfoMap[result.sender.mintAccount]!.outgoingTransactions[
       result.transaction.signature
     ] = {
       hash: result.transaction.signature,
       transaction_datetime: new Date(result.block.timestamp.iso8601),
-      amount: (result.amount * 10 ** tokenMintDecimals).toString(),
+      amount: decimalsFactor.times(result.amount).toString(),
     };
     accountInfoMap[result.receiver.mintAccount]!.incomingTransactions[
       result.transaction.signature
     ] = {
       hash: result.transaction.signature,
       transaction_datetime: new Date(result.block.timestamp.iso8601),
-      amount: (result.amount * 10 ** tokenMintDecimals).toString(),
+      amount: decimalsFactor.times(result.amount).toString(),
     };
   });
 
@@ -485,19 +489,21 @@ export async function getAllEthTokenAddressInfoAndTransactions(
       };
     }
 
+    const decimalsFactor = new BigNumber(10).pow(tokenMintDecimals);
+
     accountInfoMap[result.sender.address]!.outgoingTransactions[
       result.transaction.hash
     ] = {
       hash: result.transaction.hash,
       transaction_datetime: new Date(result.block.timestamp.iso8601),
-      amount: (result.amount * 10 ** tokenMintDecimals).toString(),
+      amount: decimalsFactor.times(result.amount).toString(),
     };
     accountInfoMap[result.receiver.address]!.incomingTransactions[
       result.transaction.hash
     ] = {
       hash: result.transaction.hash,
       transaction_datetime: new Date(result.block.timestamp.iso8601),
-      amount: (result.amount * 10 ** tokenMintDecimals).toString(),
+      amount: decimalsFactor.times(result.amount).toString(),
     };
   });
 

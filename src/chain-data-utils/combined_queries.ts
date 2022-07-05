@@ -3,6 +3,7 @@ import {
   Connection,
   TransactionResponse,
 } from "@solana/web3.js";
+import { BigNumber } from "bignumber.js";
 
 import {
   allSolanaTransfersBetweenDatesBitquery,
@@ -323,7 +324,7 @@ export async function getAllSolanaTrackedTokenAccountInfoAndTransactions(
     return {
       tokenAccountAddress: bqAccountInfo.tokenAccountAddress,
       ownerAccountAddress: bqAccountInfo.ownerAccountAddress,
-      approximateMinimumBalance: approximateMinimumBalance?.toString(),
+      approximateMinimumBalance: approximateMinimumBalance,
       incomingTransactions: bqAccountInfo.incomingTransactions,
       outgoingTransactions: bqAccountInfo.outgoingTransactions,
     };
@@ -379,13 +380,13 @@ function _getOnChainBalanceForAccountInfo(
           Object.keys(bqAccountInfo.incomingTransactions).indexOf(info.hash) !==
           -1
         ) {
-          return acc + parseInt(info.amount);
+          return acc.plus(info.amount);
         }
         if (
           Object.keys(bqAccountInfo.outgoingTransactions).indexOf(info.hash) !==
           -1
         ) {
-          return acc - parseInt(info.amount);
+          return acc.minus(info.amount);
         }
         console.error(
           `Transaction hash not found in either incoming or outgoing txns ${JSON.stringify(
@@ -394,13 +395,16 @@ function _getOnChainBalanceForAccountInfo(
         );
         return acc;
       },
-      0
-    ); // TODO: should use some bignumber lib here instead
+      new BigNumber(0)
+    );
 
-    approximateMinimumBalance =
-      allChainBalances[mostRecentTransactionInfo.hash]![
-        bqAccountInfo.ownerAccountAddress
-      ]! + followingTransactionsSum;
+    approximateMinimumBalance = followingTransactionsSum
+      .plus(
+        allChainBalances[mostRecentTransactionInfo.hash]![
+          bqAccountInfo.ownerAccountAddress
+        ]!
+      )
+      .toString();
   }
   return approximateMinimumBalance;
 }
