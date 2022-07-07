@@ -10,6 +10,7 @@ import {
   BitquerySolanaTrackedTokenAccountInfo,
   solanaTrackedTokenAccountsInfoBetweenDatesBitquery,
 } from "./bitquery";
+import { BITQUERY_TIMEOUT_BETWEEN_CALLS } from "./constants";
 
 const SOL_NETWORK = "mainnet-beta";
 const endpoint = clusterApiUrl(SOL_NETWORK);
@@ -169,8 +170,6 @@ export type TokenBalanceDate = {
   balance: number;
 };
 
-const TIMEOUT_BETWEEN_CALLS = 10000;
-
 // Calls tokenAccountBalanceOnDate for all balances between startDate and endDate.
 // Like tokenAccountBalanceOnDate, endDate is exclusive (any transactions exactly on endDateExclusive will
 // not be counted and will be included in the next day instead)
@@ -242,7 +241,7 @@ export async function getDailyTokenBalancesBetweenDates(
     );
 
     // rate limiting in case we make too many calls
-    await new Promise((f) => setTimeout(f, TIMEOUT_BETWEEN_CALLS));
+    await new Promise((f) => setTimeout(f, BITQUERY_TIMEOUT_BETWEEN_CALLS()));
   }
 
   console.log("balances", allBalances);
