@@ -12,7 +12,7 @@ import {
 } from "./constants";
 
 async function _queryBitqueryGQL(queryString: string, variables?: object) {
-  let headers = [
+  let headers: [string, string][] = [
     ["X-API-KEY", process.env.BITQUERY_API_KEY!],
     ["Content-Type", "application/json"],
   ];
@@ -94,21 +94,11 @@ type BitquerySolanaTransferAccount = {
  * "receiverAddress: {is: $tokenAccountOwnerAddress}" or undefined (if no filter needed)
  * @param tokenAccountOwnerAddress only needed if `tokenAccountOwnerFilter` is not undefined
  */
-async function _solanaTransferAmountsWithFilter(
+async function _allSolanaTransferAmounts(
   tokenMintAddress: string,
   startDateInclusive: Date,
-  endDateExclusive: Date,
-  tokenAccountOwnerFilter?: string,
-  tokenAccountOwnerAddress?: string
+  endDateExclusive: Date
 ) {
-  // make sure to only include the gql variable if we have a filter
-  const tokenAccountOwnerFilterString = tokenAccountOwnerFilter
-    ? tokenAccountOwnerFilter
-    : "";
-  const tokenAccountOwnerVariableString = tokenAccountOwnerFilter
-    ? "$tokenAccountOwnerAddress: String!,"
-    : "";
-
   // bitquery treats endDate as inclusive, so we need to subtract 1 millisecond from endDateExclusive
   // (bitquery doesn't have sub-second precision anyway and seems to just drop any milliseconds passed in, so this
   // is basically the same as subtracting 1 second, i.e. we should be calling T00:00:00Z to T23:59:59Z instead of
@@ -118,7 +108,6 @@ async function _solanaTransferAmountsWithFilter(
   const queryString = `query TransfersForSenderAndToken(
       $startTime: ISO8601DateTime!, $endTime: ISO8601DateTime!,
       $tokenMintAddress: String!,
-      ${tokenAccountOwnerVariableString}
       $limit: Int!, $offset: Int!) {
     solana {
       transfers(
@@ -126,7 +115,6 @@ async function _solanaTransferAmountsWithFilter(
         time: {between: [$startTime, $endTime]}
         currency: {is: $tokenMintAddress}
         success: {is: true}
-        ${tokenAccountOwnerFilterString}
       ) {
         amount
         transferType
@@ -158,7 +146,6 @@ async function _solanaTransferAmountsWithFilter(
     startTime: startDateInclusive.toISOString(),
     endTime: endDateInclusive.toISOString(),
     tokenMintAddress: tokenMintAddress,
-    tokenAccountOwnerAddress: tokenAccountOwnerAddress,
     // `limit` and `offset` will be added by _fetchAllPagesWithQueryAndVariables
   };
 
@@ -173,54 +160,103 @@ async function _solanaTransferAmountsWithFilter(
 // exactly on endDateExclusive will not be counted)
 // Since bitquery results don't contain the date information and aren't guaranteed to be sorted, this is best used in
 // conjunction with tokenAccountBalanceOnDateSolanaFm to just make sure there isn't anything missing in solana.fm
-export async function allSolanaTransfersBetweenDatesBitquery(
-  tokenAccountAddress: string,
+export async function lastTransactionBetweenDatesBitquery(
   tokenAccountOwnerAddress: string,
   tokenMintAddress: string,
   startDateInclusive: Date,
   endDateExclusive: Date
 ) {
-  const allowedTransferTypes = new Set(["transfer", "mint", "burn"]);
+  // bitquery treats endDate as inclusive, so we need to subtract 1 millisecond from endDateExclusive
+  // (bitquery doesn't have sub-second precision anyway and seems to just drop any milliseconds passed in, so this
+  // is basically the same as subtracting 1 second, i.e. we should be calling T00:00:00Z to T23:59:59Z instead of
+  // T00:00:00Z to T00:00:00Z to avoid duplicates/undercounting
+  const endDateInclusive = new Date(endDateExclusive.valueOf() - 1);
 
-  const transfersOut: Array<BitquerySolanaTransfer> =
-    await _solanaTransferAmountsWithFilter(
-      tokenMintAddress,
-      startDateInclusive,
-      endDateExclusive,
-      "senderAddress: {is: $tokenAccountOwnerAddress}",
-      tokenAccountOwnerAddress
-    );
+  const variables = {
+    startTime: startDateInclusive.toISOString(),
+    endTime: endDateInclusive.toISOString(),
+    tokenMintAddress: tokenMintAddress,
+    tokenAccountOwnerAddress: tokenAccountOwnerAddress,
+  };
 
-  const filteredTransfersOut = transfersOut.filter((transfer) => {
-    return (
-      allowedTransferTypes.has(transfer.transferType) &&
-      // this owner might have other token accounts so filter those out
-      transfer.sender.mintAccount == tokenAccountAddress &&
-      transfer.transaction.success
-    );
-  });
+  const senderTransactionQuery = `query TransfersForSenderAndToken(
+      $startTime: ISO8601DateTime!, $endTime: ISO8601DateTime!,
+      $tokenMintAddress: String!,
+      $tokenAccountOwnerAddress: String!) {
+    solana {
+      transfers(
+        options: {limit: 1, desc: "block.timestamp.iso8601"}
+        time: {between: [$startTime, $endTime]}
+        currency: {is: $tokenMintAddress}
+        success: {is: true}
+        senderAddress: {is: $tokenAccountOwnerAddress}
+        transferType: {in: [transfer, mint, burn]}
+      ) {
+        transaction {
+          signature
+        }
+        block {
+          timestamp {
+            iso8601
+          }
+        }
+      }
+    }
+  }
+  `;
+
+  const senderData = await _queryBitqueryGQL(senderTransactionQuery, variables);
+
+  const senderTransfers: {
+    transaction: { signature: string };
+    block: { timestamp: { iso8601: string } };
+  }[] = senderData["solana"]["transfers"];
 
   // same as transfersOut but filter by `receiverAddress` instead of `senderAddress`
-  const transfersIn: Array<BitquerySolanaTransfer> =
-    await _solanaTransferAmountsWithFilter(
-      tokenMintAddress,
-      startDateInclusive,
-      endDateExclusive,
-      "receiverAddress: {is: $tokenAccountOwnerAddress}",
-      tokenAccountOwnerAddress
-    );
+  const receiverTransactionQuery = `query TransfersForReceiverAndToken(
+    $startTime: ISO8601DateTime!, $endTime: ISO8601DateTime!,
+    $tokenMintAddress: String!,
+    $tokenAccountOwnerAddress: String!) {
+  solana {
+    transfers(
+      options: {limit: 1, desc: "block.timestamp.iso8601"}
+      time: {between: [$startTime, $endTime]}
+      currency: {is: $tokenMintAddress}
+      success: {is: true}
+      receiverAddress: {is: $tokenAccountOwnerAddress}
+      transferType: {in: [transfer, mint, burn]}
+    ) {
+      transaction {
+        signature
+      }
+      block {
+        timestamp {
+          iso8601
+        }
+      }
+    }
+  }
+}
+`;
 
-  // same as totalTransfersOut but filter by `transfer.receiver` instead of `transfer.sender`
-  const filteredTransfersIn = transfersIn.filter((transfer) => {
-    return (
-      allowedTransferTypes.has(transfer.transferType) &&
-      // this owner might have other token accounts so filter those out
-      transfer.receiver.mintAccount == tokenAccountAddress &&
-      transfer.transaction.success
-    );
-  });
+  const receiverData = await _queryBitqueryGQL(
+    receiverTransactionQuery,
+    variables
+  );
 
-  return filteredTransfersOut.concat(filteredTransfersIn);
+  const receiverTransfers: {
+    transaction: { signature: string };
+    block: { timestamp: { iso8601: string } };
+  }[] = receiverData["solana"]["transfers"];
+
+  // get the most recent signature
+  return senderTransfers
+    .concat(receiverTransfers)
+    .sort(
+      (transfer1, transfer2) =>
+        new Date(transfer2.block.timestamp.iso8601).getTime() -
+        new Date(transfer1.block.timestamp.iso8601).getTime()
+    )[0]?.transaction.signature;
 }
 
 export type BitquerySolanaTrackedTokenAccountInfo = {
@@ -248,12 +284,10 @@ export async function solanaTrackedTokenAccountsInfoBetweenDatesBitquery(
   startDateInclusive: Date,
   endDateExclusive: Date
 ) {
-  let results = await _solanaTransferAmountsWithFilter(
+  let results = await _allSolanaTransferAmounts(
     tokenMintAddress,
     startDateInclusive,
-    endDateExclusive,
-    undefined,
-    undefined
+    endDateExclusive
   );
 
   let accountInfoMap: { [key: string]: BitquerySolanaTrackedTokenAccountInfo } =

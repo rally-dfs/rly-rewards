@@ -82,7 +82,6 @@ export async function getDailyTokenBalances(
 
   const allAccounts: {
     liquidity_pool_id: number;
-    collateral_token_account: string;
     collateral_token_account_owner: string;
     mint_address: string;
     decimals: number;
@@ -95,13 +94,12 @@ export async function getDailyTokenBalances(
     const account = allAccounts[i]!;
     console.log(
       `==== Fetching balances for account ${new PublicKey(
-        account.collateral_token_account
+        account.collateral_token_account_owner
       ).toString()} from ${earliestEndDate} to ${latestEndDate} ====`
     );
 
     try {
       const tokenBalanceDates = await getDailyTokenBalancesBetweenDates(
-        new PublicKey(account.collateral_token_account).toString(),
         new PublicKey(account.collateral_token_account_owner).toString(),
         new PublicKey(account.mint_address).toString(),
         earliestEndDate,
@@ -124,7 +122,7 @@ export async function getDailyTokenBalances(
 
       console.log(
         `Inserted balances for ${new PublicKey(
-          account.collateral_token_account
+          account.collateral_token_account_owner
         ).toString()}, pks ${result.map((res) => res.id)}`
       );
     } catch (error) {

@@ -6,7 +6,7 @@ import {
 import { BigNumber } from "bignumber.js";
 
 import {
-  allSolanaTransfersBetweenDatesBitquery,
+  lastTransactionBetweenDatesBitquery,
   BitquerySolanaTrackedTokenAccountInfo,
   solanaTrackedTokenAccountsInfoBetweenDatesBitquery,
 } from "./bitquery";
@@ -122,7 +122,6 @@ export async function getMultipleSolanaTransactionBalances(
 }
 
 export async function tokenAccountBalanceOnDate(
-  tokenAccountAddress: string,
   tokenAccountOwnerAddress: string,
   tokenMintAddress: string,
   endDateExclusive: Date,
@@ -130,21 +129,12 @@ export async function tokenAccountBalanceOnDate(
   previousEndDateExclusive: Date
 ) {
   // load all transfers in
-  const transfersBQ = (
-    await allSolanaTransfersBetweenDatesBitquery(
-      tokenAccountAddress,
-      tokenAccountOwnerAddress,
-      tokenMintAddress,
-      previousEndDateExclusive,
-      endDateExclusive
-    )
-  ).sort(
-    (txn1, txn2) =>
-      new Date(txn2.block.timestamp.iso8601).getTime() -
-      new Date(txn1.block.timestamp.iso8601).getTime()
+  const latestTxnHash = await lastTransactionBetweenDatesBitquery(
+    tokenAccountOwnerAddress,
+    tokenMintAddress,
+    previousEndDateExclusive,
+    endDateExclusive
   );
-
-  const latestTxnHash = transfersBQ[0]?.transaction.signature;
 
   if (latestTxnHash === undefined) {
     // both solana.fm and bitquery didn't return any txns, likely just no txns on that day
@@ -187,7 +177,6 @@ const TIMEOUT_BETWEEN_CALLS = 10000;
 // Currently just returns an array of TokenBalanceDate but this probably will eventually be called to backfill
 // all the dates for a token in the DB or something.
 export async function getDailyTokenBalancesBetweenDates(
-  tokenAccountAddress: string,
   tokenAccountOwnerAddress: string,
   tokenMintAddress: string,
   earliestEndDateExclusive: Date,
@@ -213,7 +202,6 @@ export async function getDailyTokenBalancesBetweenDates(
 
     try {
       let balance = await tokenAccountBalanceOnDate(
-        tokenAccountAddress,
         tokenAccountOwnerAddress,
         tokenMintAddress,
         currentEndDateExclusive,
@@ -237,7 +225,7 @@ export async function getDailyTokenBalancesBetweenDates(
     } catch (error) {
       console.error(
         "Error fetching balance",
-        tokenAccountAddress,
+        tokenAccountOwnerAddress,
         currentEndDateExclusive,
         previousEndDateExclusive,
         error
