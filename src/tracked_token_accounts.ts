@@ -1,14 +1,14 @@
 import { getKnex } from "./database";
-import {
-  getAllSolanaTrackedTokenAccountInfoAndTransactions,
-  TrackedTokenAccountInfo,
-} from "./chain-data-utils/combined_queries";
+
 import { TrackedTokenAccount } from "./knex-types/tracked_token_account";
 import { TrackedTokenAccountBalance } from "./knex-types/tracked_token_account_balance";
 import { TrackedTokenAccountTransaction } from "./knex-types/tracked_token_account_transaction";
 import { TrackedTokenAccountBalanceChange } from "./knex-types/tracked_token_account_balance_change";
 import { TrackedTokenChain } from "./knex-types/tracked_token";
-import { getAllEthTokenAddressInfoAndTransactions } from "./chain-data-utils/bitquery";
+
+import { TrackedTokenAccountInfo } from "./chain-data-utils/bq_tracked_token_base";
+import { getAllSolanaTrackedTokenAccountInfoAndTransactions } from "./chain-data-utils/bq_tracked_token_sol";
+import { getAllEthTokenAddressInfoAndTransactions } from "./chain-data-utils/bq_tracked_token_eth";
 
 /** Calls getAllTrackedTokenAccountInfoAndTransactions for all token accounts from `previously fetched end date + 24 hours`
  * (inclusive) to `end date` (exclusive).

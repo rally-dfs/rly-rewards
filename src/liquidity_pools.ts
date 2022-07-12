@@ -1,6 +1,6 @@
 import { getKnex } from "./database";
 import { PublicKey } from "@solana/web3.js";
-import { getDailyTokenBalancesBetweenDates } from "./chain-data-utils/combined_queries";
+import { getDailyTokenBalancesBetweenDates } from "./chain-data-utils/bq_liquidity_pool";
 import { LiquidityPoolBalance } from "./knex-types/liquidity_pool_balance";
 
 /** Calls getDailyTokenBalancesBetweenDates for all token accounts, starting from the last date whose balance we have */
