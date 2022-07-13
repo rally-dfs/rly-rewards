@@ -15,7 +15,7 @@ function relevantLiquidityPoolIds(
 
 export async function totalValueLockedInPools(
   collateralTokens: LiquidityCollateralToken[]
-): Promise<string | number> {
+) {
   const dbResponse = await knex
     .from(
       knex
@@ -44,7 +44,7 @@ export async function totalValueLockedInPools(
     .sum("balance as total_balance")
     .where("row_number", "=", 1);
 
-  return dbResponse[0]?.total_balance || 0;
+  return parseInt(dbResponse[0]?.total_balance) || 0;
 }
 
 export async function valueLockedByDay(

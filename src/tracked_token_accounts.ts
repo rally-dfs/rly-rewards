@@ -293,7 +293,7 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
   // next insert all the TrackedTokenAccountBalances and TrackedTokenAccountBalanceChanges
   const tokenAccountBalanceChangesRows = filteredAccountInfos
     .filter((accountInfo) => {
-      // balance is optional due to solana.fm flakiness so just skip those rows if they don't exist
+      // balance might be missing if something went wrong with on chain fetch, just skip
       return accountInfo.approximateMinimumBalance !== undefined;
     })
     .map((accountInfo) => {
@@ -330,8 +330,6 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
 
   // update with new balances from current day and write that into TrackedTokenAccountBalance
   filteredAccountInfos.forEach((accountInfo) => {
-    // balance is optional due to solana.fm flakiness so just keep previous day's data
-    // TODO: we could improve this by falling back on bitquery's delta_balance data
     if (accountInfo.approximateMinimumBalance !== undefined) {
       currentDayBalances[
         accountIdsByAddress[accountInfo.tokenAccountAddress]!
@@ -368,26 +366,30 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
 
   filteredAccountInfos.forEach((accountInfo) => {
     incomingTransactionRows.push(
-      ...[...accountInfo.incomingTransactions].map((hash) => {
+      ...Object.values(accountInfo.incomingTransactions).map((txn) => {
         return {
           tracked_token_account_id: parseInt(
             accountIdsByAddress[accountInfo.tokenAccountAddress]!
           ),
           datetime: endDateExclusive,
-          transaction_hash: hash!,
+          transaction_datetime: txn.transaction_datetime,
+          transaction_hash: txn.hash,
+          amount: txn.amount,
           transfer_in: true,
         };
       })
     );
 
     outgoingTransactionRows.push(
-      ...[...accountInfo.outgoingTransactions].map((hash) => {
+      ...Object.values(accountInfo.outgoingTransactions).map((txn) => {
         return {
           tracked_token_account_id: parseInt(
             accountIdsByAddress[accountInfo.tokenAccountAddress]!
           ),
           datetime: endDateExclusive,
-          transaction_hash: hash!,
+          transaction_datetime: txn.transaction_datetime,
+          transaction_hash: txn.hash,
+          amount: txn.amount,
           transfer_in: false,
         };
       })

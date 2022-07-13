@@ -1,11 +1,13 @@
-import { clusterApiUrl, Connection } from "@solana/web3.js";
+import {
+  clusterApiUrl,
+  Connection,
+  TransactionResponse,
+} from "@solana/web3.js";
+import { BigNumber } from "bignumber.js";
 
 import {
-  latestAccountInputsOnDateSolanaFm,
-  tokenAccountsInfoBetweenDatesSolanaFm,
-} from "./solana_fm";
-import {
   allSolanaTransfersBetweenDatesBitquery,
+  BitquerySolanaTrackedTokenAccountInfo,
   solanaTrackedTokenAccountsInfoBetweenDatesBitquery,
 } from "./bitquery";
 
@@ -13,54 +15,136 @@ const SOL_NETWORK = "mainnet-beta";
 const endpoint = clusterApiUrl(SOL_NETWORK);
 const connection = new Connection(endpoint, "finalized");
 
+// just exported for test mocking, shouldn't be needed in any real code
+export const TEST_MOCK_ONLY_CONNECTION = connection;
+
+/** Calls solana `getTransaction` in a loop and returns the desired accounts' postBalances. `getTransactions` doesn't
+ * seem to work on solana RPC due to rate limits but if we switch to a real RPC provider we can probably simplify this
+ *
+ * TODO: this should be moved to a different file with the other solana on chain code
+ *
+ * @param txnInfos dictionary of {txn_hash: [list of tokenAccountOwnerAddresses to fetch balances for]}
+ * @param tokenMintAddress token mint address. Calling this is only supported for one mint at a time
+ * @param retryLimit number of retries for failed txn hashes, solana RPC is flaky sometimes
+ * @return dictionary {txn_hash: {tokenAccountOwnerAddresses: balance}}
+ */
+export async function getMultipleSolanaTransactionBalances(
+  txnInfos: { [key: string]: string[] },
+  tokenMintAddress: string,
+  retryLimit: number
+) {
+  const results: { [key: string]: { [key: string]: number } } = {};
+  const retries: { [key: string]: string[] } = {};
+
+  const txnHashes = Object.keys(txnInfos);
+
+  for (let i = 0; i < txnHashes.length; i++) {
+    // TODO: this is just using solana.com's RPC limits, can adjust a real rate limit later
+    if (i != 0 && i % 40 == 0) {
+      await new Promise((f) => setTimeout(f, 13000));
+    }
+
+    const hash = txnHashes[i]!;
+
+    let txnInfo: TransactionResponse;
+    try {
+      // batching these with Promises.all also causes rate limit overflows so just do it one at a time
+      const response = await connection.getTransaction(hash, {
+        commitment: "confirmed",
+      });
+      if (!response) {
+        throw Error("Empty txnInfo returned");
+      }
+
+      txnInfo = response;
+    } catch (error) {
+      retries[hash] = txnInfos[hash]!;
+      continue;
+    }
+
+    results[hash] = {};
+
+    const ownerAddresses = txnInfos[hash]!;
+    ownerAddresses.forEach((tokenAccountOwnerAddress) => {
+      const balances = txnInfo?.meta?.postTokenBalances?.filter(
+        (tokenInfo) =>
+          (tokenInfo.owner === tokenAccountOwnerAddress &&
+            tokenInfo.mint === tokenMintAddress) ||
+          // sometimes bitquery incorrectly returns the token address as the owner instead (think this happens if the
+          // account is closed and rent removed, which messes with their scraping), so we can fall back on
+          // using it as the account address instead and look it up in accountKeys
+          tokenInfo.accountIndex ==
+            txnInfo.transaction.message.accountKeys
+              .map((accountKey) => accountKey.toString())
+              .indexOf(tokenAccountOwnerAddress)
+      );
+
+      if (!balances || balances.length === 0) {
+        console.error(
+          `Couldn't find on chain balance for ${hash} and ${tokenAccountOwnerAddress}`
+        );
+        return undefined;
+      }
+
+      if (balances.length > 1) {
+        // this error is nonfatal (shouldn't really happen anyway unless there's a solana error)
+        console.error(
+          `Found more than 1 token account for txn ${hash} and ${tokenAccountOwnerAddress}`
+        );
+      }
+
+      results[hash]![tokenAccountOwnerAddress] = parseInt(
+        balances[0]!.uiTokenAmount.amount
+      );
+    });
+  }
+
+  // if retries are on, recursively call and merge results
+  if (retryLimit >= 0 && Object.keys(retries).length > 0) {
+    console.log(
+      `Retrying solana getTransactions, ${retryLimit} remaining. Hashes ${Object.keys(
+        retries
+      )}`
+    );
+
+    const retryResults = await getMultipleSolanaTransactionBalances(
+      retries,
+      tokenMintAddress,
+      retryLimit - 1
+    );
+
+    Object.entries(retryResults).forEach(([hash, balances]) => {
+      results[hash] = balances;
+    });
+  }
+
+  return results;
+}
+
 export async function tokenAccountBalanceOnDate(
   tokenAccountAddress: string,
   tokenAccountOwnerAddress: string,
   tokenMintAddress: string,
   endDateExclusive: Date,
   previousBalance: number,
-  previousEndDateExclusive: Date,
-  tokenMintDecimals: number
+  previousEndDateExclusive: Date
 ) {
-  // call sfm, then use that date range to call bitquery
-  const latestAccountInputSFM = await latestAccountInputsOnDateSolanaFm(
-    tokenAccountAddress,
-    tokenMintAddress,
-    endDateExclusive,
-    previousEndDateExclusive
-  );
-
-  // just load the BQ transfers after the last found SFM account-input
-  const startDateInclusive = latestAccountInputSFM
-    ? new Date(latestAccountInputSFM.timestamp)
-    : previousEndDateExclusive;
-
-  // this will only be non empty if there was some missing txn in SFM, checking just in case
+  // load all transfers in
   const transfersBQ = (
     await allSolanaTransfersBetweenDatesBitquery(
       tokenAccountAddress,
       tokenAccountOwnerAddress,
       tokenMintAddress,
-      startDateInclusive,
+      previousEndDateExclusive,
       endDateExclusive
     )
-  ).filter(
-    (transfer) =>
-      transfer.transaction.signature != latestAccountInputSFM?.transactionHash
+  ).sort(
+    (txn1, txn2) =>
+      new Date(txn2.block.timestamp.iso8601).getTime() -
+      new Date(txn1.block.timestamp.iso8601).getTime()
   );
 
-  if (transfersBQ[0]) {
-    // should probably log this and manually investigate this, bitquery txns are unordered and don't include
-    // a timestamp so we have to settle for just picking the first one
-    console.error(
-      "Found txn in BQ not found in SFM, should double check this day's data manually",
-      transfersBQ
-    );
-  }
-
-  const latestTxnHash = transfersBQ[0]
-    ? transfersBQ[0].transaction.signature
-    : latestAccountInputSFM?.transactionHash;
+  const latestTxnHash = transfersBQ[0]?.transaction.signature;
 
   if (latestTxnHash === undefined) {
     // both solana.fm and bitquery didn't return any txns, likely just no txns on that day
@@ -78,19 +162,13 @@ export async function tokenAccountBalanceOnDate(
   );
 
   if (!balances) {
-    // should log an error and investigate manually
-    console.log(
-      "Couldn't find on chain balance, falling back to solana.fm value",
-      latestTxnHash
-    );
-    // solana.fm postBalance has no decimals so just multiply by 10^tokenMintDecimals to normalize
-    return latestAccountInputSFM?.postBalance
-      ? latestAccountInputSFM?.postBalance * 10 ** tokenMintDecimals
-      : undefined;
+    console.error("Couldn't find on chain balance", latestTxnHash);
+    return undefined;
   }
 
   if (balances.length > 1) {
-    console.log("Found more than 1 token account for txn", latestTxnHash);
+    // this error is nonfatal (shouldn't really happen anyway unless there's a solana error)
+    console.error("Found more than 1 token account for txn", latestTxnHash);
   }
 
   return parseInt(balances[0]!.uiTokenAmount.amount);
@@ -113,8 +191,7 @@ export async function getDailyTokenBalancesBetweenDates(
   tokenAccountOwnerAddress: string,
   tokenMintAddress: string,
   earliestEndDateExclusive: Date,
-  latestEndDateExclusive: Date,
-  tokenMintDecimals: number
+  latestEndDateExclusive: Date
 ) {
   let allBalances: Array<TokenBalanceDate> = [];
 
@@ -141,8 +218,7 @@ export async function getDailyTokenBalancesBetweenDates(
         tokenMintAddress,
         currentEndDateExclusive,
         previousBalance,
-        previousEndDateExclusive,
-        tokenMintDecimals
+        previousEndDateExclusive
       );
 
       console.log(currentEndDateExclusive, "balance = ", balance);
@@ -186,13 +262,18 @@ export async function getDailyTokenBalancesBetweenDates(
   return allBalances;
 }
 
+export type TrackedTokenAccountInfoTransaction = {
+  hash: string;
+  transaction_datetime: Date;
+  amount: string; // needs to be string since eth values can overflow `number`
+};
+
 export type TrackedTokenAccountInfo = {
   tokenAccountAddress: string;
   ownerAccountAddress?: string;
-  // see note in TrackedTokenAccountBalance.approximate_minimum_balance on this
   approximateMinimumBalance?: string;
-  incomingTransactions: Set<string>;
-  outgoingTransactions: Set<string>;
+  incomingTransactions: { [key: string]: TrackedTokenAccountInfoTransaction };
+  outgoingTransactions: { [key: string]: TrackedTokenAccountInfoTransaction };
 };
 
 /** Calls both bitquery and solana.fm versions of getAllTrackedTokenAccountInfo for tokenMintAddress from
@@ -209,58 +290,128 @@ export async function getAllSolanaTrackedTokenAccountInfoAndTransactions(
   startDateInclusive: Date,
   endDateExclusive: Date
 ): Promise<TrackedTokenAccountInfo[]> {
-  // solana.fm token accounts info
-  let tokenAccountsInfoSFMMap = await tokenAccountsInfoBetweenDatesSolanaFm(
-    tokenMintAddress,
-    startDateInclusive,
-    endDateExclusive
-  );
-
-  if (tokenAccountsInfoSFMMap === undefined) {
-    console.log("Error retrieving solana.fm token account info");
-  }
-
   // bitquery token accounts info
   // note this returns delta(balance) from startDate instead of actual balance (not used for now)
   let tokenAccountsInfoBQMap =
     await solanaTrackedTokenAccountsInfoBetweenDatesBitquery(
       tokenMintAddress,
+      tokenMintDecimals,
       startDateInclusive,
       endDateExclusive
     );
 
-  // marry together the two and return a combined list
-  // note, after some manual testing, there's a lot of buggy data on solana.fm for the /account-inputs/tokens/{token}
-  // call. sometimes txns are missing entirely (even if it shows up in /account-inputs/{account} and sometimes the
-  // postBalance is completely wrong so its incoming/outgoing is miscategorized
-  // so SFM is probably useful just for the `balance` field and can defer 100% to bitquery for outgoing/incoming txns
-  // (in theory we could use SFM to sanity check that bitquery has correct transactions where the value is >= 1, but
-  // because they have scraping errors sometimes that completely miscategorize them it doesn't seem work the effort)
-  return Object.values(tokenAccountsInfoBQMap).map((bqAccountInfo) => {
-    const sfmAccountInfo = tokenAccountsInfoSFMMap
-      ? tokenAccountsInfoSFMMap[bqAccountInfo.tokenAccountAddress]
-      : undefined;
+  // get on chain balances for txns
+  // transform into {transaction_hash: [accountAddress]}
+  const accountAddressesByTxnHash: { [key: string]: string[] } = {};
 
-    // defer to solana.fm balance but since it's often missing, we can use bitquery balanceChange info too
-    // if it's positive (if it's negative, too hard to try and tie together from previous days, just don't save
-    // the row)
-    const bitqueryMinimumBalance =
-      bqAccountInfo.balanceChange > 0
-        ? bqAccountInfo.balanceChange * 10 ** tokenMintDecimals
-        : undefined;
-    const approximateMinimumBalance = sfmAccountInfo?.balance
-      ? sfmAccountInfo?.balance * 10 ** tokenMintDecimals
-      : bitqueryMinimumBalance;
+  Object.values(tokenAccountsInfoBQMap).forEach((bqAccountInfo) => {
+    Object.keys(bqAccountInfo.incomingTransactions)
+      .concat(Object.keys(bqAccountInfo.outgoingTransactions))
+      .forEach((txn) => {
+        if (accountAddressesByTxnHash[txn] === undefined) {
+          accountAddressesByTxnHash[txn] = [];
+        }
+        accountAddressesByTxnHash[txn]?.push(bqAccountInfo.ownerAccountAddress);
+      });
+  });
+
+  const allChainBalances = await getMultipleSolanaTransactionBalances(
+    accountAddressesByTxnHash,
+    tokenMintAddress,
+    2
+  );
+
+  return Object.values(tokenAccountsInfoBQMap).map((bqAccountInfo) => {
+    // get the most recent transaction for this account and pull the balance from allChainBalances
+    let approximateMinimumBalance = _getOnChainBalanceForAccountInfo(
+      bqAccountInfo,
+      allChainBalances
+    );
 
     return {
       tokenAccountAddress: bqAccountInfo.tokenAccountAddress,
       ownerAccountAddress: bqAccountInfo.ownerAccountAddress,
-      approximateMinimumBalance: approximateMinimumBalance
-        ? // make sure to round this to an int, sometimes the APIs return weird values more than 9 decimals
-          Math.round(approximateMinimumBalance).toString()
-        : undefined,
+      approximateMinimumBalance: approximateMinimumBalance,
       incomingTransactions: bqAccountInfo.incomingTransactions,
       outgoingTransactions: bqAccountInfo.outgoingTransactions,
     };
   });
+}
+
+/** Helper function to find the most recent txn for bqAccountInfo.ownerAccountAddresss in allChainBalances
+ * If that txn isn't found (i.e. the on chain call failed), fall back on whatever txn we can for this owner and
+ * add up bitquery's balance deltas manually
+ *
+ * @param bqAccountInfo
+ * @param allChainBalances
+ * @returns balance
+ */
+function _getOnChainBalanceForAccountInfo(
+  bqAccountInfo: BitquerySolanaTrackedTokenAccountInfo,
+  allChainBalances: { [key: string]: { [key: string]: number } }
+) {
+  const allAccountTransactionInfos = Object.values(
+    bqAccountInfo.incomingTransactions
+  ).concat(Object.values(bqAccountInfo.outgoingTransactions));
+
+  const sortedAccountTransactionInfos = allAccountTransactionInfos
+    .filter(
+      (info) =>
+        info.transaction_datetime !== undefined &&
+        allChainBalances[info.hash] !== undefined &&
+        allChainBalances[info.hash]![bqAccountInfo.ownerAccountAddress] !==
+          undefined
+    )
+    .sort(
+      (info1, info2) =>
+        info2.transaction_datetime.getTime() -
+        info1.transaction_datetime.getTime()
+    );
+
+  const mostRecentTransactionInfo = sortedAccountTransactionInfos[0];
+
+  let approximateMinimumBalance;
+
+  if (mostRecentTransactionInfo) {
+    // if the most recent one wasn't available on chain for some reason, try to calculate it manually by adding up
+    // any `amounts` that happened after mostRecentTransactionInfo
+    const followingTransactions = allAccountTransactionInfos.filter(
+      (info) =>
+        info.transaction_datetime >
+        mostRecentTransactionInfo.transaction_datetime
+    );
+
+    const followingTransactionsSum = followingTransactions.reduce(
+      (acc, info) => {
+        if (
+          Object.keys(bqAccountInfo.incomingTransactions).indexOf(info.hash) !==
+          -1
+        ) {
+          return acc.plus(info.amount);
+        }
+        if (
+          Object.keys(bqAccountInfo.outgoingTransactions).indexOf(info.hash) !==
+          -1
+        ) {
+          return acc.minus(info.amount);
+        }
+        console.error(
+          `Transaction hash not found in either incoming or outgoing txns ${JSON.stringify(
+            info
+          )} ${JSON.stringify(bqAccountInfo)}`
+        );
+        return acc;
+      },
+      new BigNumber(0)
+    );
+
+    approximateMinimumBalance = followingTransactionsSum
+      .plus(
+        allChainBalances[mostRecentTransactionInfo.hash]![
+          bqAccountInfo.ownerAccountAddress
+        ]!
+      )
+      .toString();
+  }
+  return approximateMinimumBalance;
 }

@@ -44,15 +44,39 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
           tokenAccountAddress: "account1",
           ownerAccountAddress: "owner1",
           approximateMinimumBalance: "10",
-          incomingTransactions: new Set<string>(["txnin1"]),
-          outgoingTransactions: new Set<string>(["txnout1"]),
+          incomingTransactions: {
+            txnin1: {
+              hash: "txnin1",
+              transaction_datetime: new Date("2022-01-01"),
+              amount: "1.111",
+            },
+          },
+          outgoingTransactions: {
+            txnout1: {
+              hash: "txnout1",
+              transaction_datetime: new Date("2022-01-01"),
+              amount: "1.111",
+            },
+          },
         },
         {
           tokenAccountAddress: "account2",
           ownerAccountAddress: "owner2",
           approximateMinimumBalance: "20",
-          incomingTransactions: new Set<string>(["txnin2"]),
-          outgoingTransactions: new Set<string>(["txnout2"]),
+          incomingTransactions: {
+            txnin1: {
+              hash: "txnin2",
+              transaction_datetime: new Date("2022-02-02"),
+              amount: "2.222",
+            },
+          },
+          outgoingTransactions: {
+            txnout2: {
+              hash: "txnout2",
+              transaction_datetime: new Date("2022-02-02"),
+              amount: "2.222",
+            },
+          },
         },
       ])
     );
@@ -64,15 +88,39 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
           tokenAccountAddress: "account1",
           ownerAccountAddress: "owner1",
           approximateMinimumBalance: "0",
-          incomingTransactions: new Set<string>(["txnin12"]),
-          outgoingTransactions: new Set<string>(["txnout12"]),
+          incomingTransactions: {
+            txnin12: {
+              hash: "txnin12",
+              transaction_datetime: new Date("2022-12-12"),
+              amount: "12.121212",
+            },
+          },
+          outgoingTransactions: {
+            txnout12: {
+              hash: "txnout12",
+              transaction_datetime: new Date("2022-12-12"),
+              amount: "12.121212",
+            },
+          },
         },
         {
           tokenAccountAddress: "account3",
           ownerAccountAddress: "owner3",
           approximateMinimumBalance: "30",
-          incomingTransactions: new Set<string>(["txnin3"]),
-          outgoingTransactions: new Set<string>(["txnout3"]),
+          incomingTransactions: {
+            txnin12: {
+              hash: "txnin3",
+              transaction_datetime: new Date("2022-03-03"),
+              amount: "3.333",
+            },
+          },
+          outgoingTransactions: {
+            txnout3: {
+              hash: "txnout3",
+              transaction_datetime: new Date("2022-03-03"),
+              amount: "3.333",
+            },
+          },
         },
       ])
     );
@@ -84,15 +132,39 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
           tokenAccountAddress: "account3",
           ownerAccountAddress: "owner3",
           approximateMinimumBalance: "300",
-          incomingTransactions: new Set<string>(["txnin31"]),
-          outgoingTransactions: new Set<string>(["txnout31"]),
+          incomingTransactions: {
+            txnin12: {
+              hash: "txnin31",
+              transaction_datetime: new Date("2022-03-01"),
+              amount: "31.313131",
+            },
+          },
+          outgoingTransactions: {
+            txnout31: {
+              hash: "txnout31",
+              transaction_datetime: new Date("2022-03-01"),
+              amount: "31.313131",
+            },
+          },
         },
         {
           tokenAccountAddress: "account4",
           ownerAccountAddress: "owner4",
           approximateMinimumBalance: "40",
-          incomingTransactions: new Set<string>(["txnin4"]),
-          outgoingTransactions: new Set<string>(["txnout4"]),
+          incomingTransactions: {
+            txnin12: {
+              hash: "txnin4",
+              transaction_datetime: new Date("2022-04-04"),
+              amount: "4.444",
+            },
+          },
+          outgoingTransactions: {
+            txnout4: {
+              hash: "txnout4",
+              transaction_datetime: new Date("2022-04-04"),
+              amount: "4.444",
+            },
+          },
         },
       ])
     );
@@ -206,6 +278,8 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
             )!.id,
             datetime: new Date("2022-06-01"),
             transaction_hash: "txnin1",
+            amount: "1.111",
+            transaction_datetime: new Date("2022-01-01"),
             transfer_in: true,
           },
           {
@@ -214,6 +288,8 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
             )!.id,
             datetime: new Date("2022-06-01"),
             transaction_hash: "txnin2",
+            amount: "2.222",
+            transaction_datetime: new Date("2022-02-02"),
             transfer_in: true,
           },
           {
@@ -222,6 +298,8 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
             )!.id,
             datetime: new Date("2022-06-01"),
             transaction_hash: "txnout1",
+            amount: "1.111",
+            transaction_datetime: new Date("2022-01-01"),
             transfer_in: false,
           },
           {
@@ -230,6 +308,8 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
             )!.id,
             datetime: new Date("2022-06-01"),
             transaction_hash: "txnout2",
+            amount: "2.222",
+            transaction_datetime: new Date("2022-02-02"),
             transfer_in: false,
           },
         ]);
@@ -443,6 +523,8 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
             )!.id,
             datetime: new Date("2022-06-01"),
             transaction_hash: "txnin1",
+            amount: "1.111",
+            transaction_datetime: new Date("2022-01-01"),
             transfer_in: true,
           },
           {
@@ -451,6 +533,8 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
             )!.id,
             datetime: new Date("2022-06-01"),
             transaction_hash: "txnin2",
+            amount: "2.222",
+            transaction_datetime: new Date("2022-02-02"),
             transfer_in: true,
           },
           {
@@ -459,6 +543,8 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
             )!.id,
             datetime: new Date("2022-06-01"),
             transaction_hash: "txnout1",
+            amount: "1.111",
+            transaction_datetime: new Date("2022-01-01"),
             transfer_in: false,
           },
           {
@@ -467,6 +553,8 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
             )!.id,
             datetime: new Date("2022-06-01"),
             transaction_hash: "txnout2",
+            amount: "2.222",
+            transaction_datetime: new Date("2022-02-02"),
             transfer_in: false,
           },
           // 6/2 transactions
@@ -476,6 +564,8 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
             )!.id,
             datetime: new Date("2022-06-02"),
             transaction_hash: "txnin12",
+            amount: "12.121212",
+            transaction_datetime: new Date("2022-12-12"),
             transfer_in: true,
           },
           {
@@ -484,6 +574,8 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
             )!.id,
             datetime: new Date("2022-06-02"),
             transaction_hash: "txnin3",
+            amount: "3.333",
+            transaction_datetime: new Date("2022-03-03"),
             transfer_in: true,
           },
           {
@@ -492,6 +584,8 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
             )!.id,
             datetime: new Date("2022-06-02"),
             transaction_hash: "txnout12",
+            amount: "12.121212",
+            transaction_datetime: new Date("2022-12-12"),
             transfer_in: false,
           },
           {
@@ -500,6 +594,8 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
             )!.id,
             datetime: new Date("2022-06-02"),
             transaction_hash: "txnout3",
+            amount: "3.333",
+            transaction_datetime: new Date("2022-03-03"),
             transfer_in: false,
           },
           // 6/3 transactions
@@ -509,6 +605,8 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
             )!.id,
             datetime: new Date("2022-06-03"),
             transaction_hash: "txnin31",
+            amount: "31.313131",
+            transaction_datetime: new Date("2022-03-01"),
             transfer_in: true,
           },
           {
@@ -517,6 +615,8 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
             )!.id,
             datetime: new Date("2022-06-03"),
             transaction_hash: "txnin4",
+            amount: "4.444",
+            transaction_datetime: new Date("2022-04-04"),
             transfer_in: true,
           },
           {
@@ -525,6 +625,8 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
             )!.id,
             datetime: new Date("2022-06-03"),
             transaction_hash: "txnout31",
+            amount: "31.313131",
+            transaction_datetime: new Date("2022-03-01"),
             transfer_in: false,
           },
           {
@@ -533,6 +635,8 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
             )!.id,
             datetime: new Date("2022-06-03"),
             transaction_hash: "txnout4",
+            amount: "4.444",
+            transaction_datetime: new Date("2022-04-04"),
             transfer_in: false,
           },
         ]);

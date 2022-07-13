@@ -1,6 +1,15 @@
-import { TrackedTokenAccountInfo } from "./combined_queries";
+import { BigNumber } from "bignumber.js";
+
+import {
+  TrackedTokenAccountInfo,
+  TrackedTokenAccountInfoTransaction,
+} from "./combined_queries";
 import { getERC20BalancesForAddressesAtBlocks } from "./ethereum";
 import { queryGQL } from "./graphql";
+import {
+  BITQUERY_FETCH_ALL_PAGES_PAGE_LIMIT,
+  BITQUERY_TIMEOUT_BETWEEN_CALLS,
+} from "./constants";
 
 async function _queryBitqueryGQL(queryString: string, variables?: object) {
   let headers = [
@@ -15,9 +24,6 @@ async function _queryBitqueryGQL(queryString: string, variables?: object) {
   );
 }
 
-// wait 10 seconds between API calls (this can probably be reduced if we pay for a better plan)
-const TIMEOUT_BETWEEN_CALLS = 10000;
-
 /** Helper to handle getting all pages of results (with rate limiting built in)
  *
  * @param queryString graphql query as a string. Must include `limit` and `offset` as inputs
@@ -30,7 +36,7 @@ async function _fetchAllPagesWithQueryAndVariables<T>(
   variables: any,
   dataPath: (data: any) => Array<T>
 ) {
-  const pageLimit = 2500;
+  const pageLimit = BITQUERY_FETCH_ALL_PAGES_PAGE_LIMIT();
   const maxOffset = pageLimit * 1000000; // infinite loop protection
 
   let allTransfers: Array<T> = [];
@@ -54,18 +60,19 @@ async function _fetchAllPagesWithQueryAndVariables<T>(
     offset += pageLimit;
 
     // rate limiting here in case we make too many calls
-    await new Promise((f) => setTimeout(f, TIMEOUT_BETWEEN_CALLS));
+    await new Promise((f) => setTimeout(f, BITQUERY_TIMEOUT_BETWEEN_CALLS()));
   }
 
   return allTransfers;
 }
 
 type BitquerySolanaTransfer = {
-  amount: number;
+  amount: number; // note bitquery returns this as a decimal, e.g. `12.3456` instead of `12345600000` (for 9 decimals)
   transferType: string; // "transfer" "mint" "burn" "self", maybe others?
   transaction: BitquerySolanaTransaction;
   sender: BitquerySolanaTransferAccount;
   receiver: BitquerySolanaTransferAccount;
+  block: { timestamp: { iso8601: string } };
 };
 type BitquerySolanaTransaction = {
   signature: string;
@@ -118,6 +125,7 @@ async function _solanaTransferAmountsWithFilter(
         options: {limit: $limit, offset: $offset}
         time: {between: [$startTime, $endTime]}
         currency: {is: $tokenMintAddress}
+        success: {is: true}
         ${tokenAccountOwnerFilterString}
       ) {
         amount
@@ -135,6 +143,11 @@ async function _solanaTransferAmountsWithFilter(
           address
           mintAccount
           type
+        }
+        block {
+          timestamp {
+            iso8601
+          }
         }
       }
     }
@@ -212,10 +225,9 @@ export async function allSolanaTransfersBetweenDatesBitquery(
 
 export type BitquerySolanaTrackedTokenAccountInfo = {
   tokenAccountAddress: string;
-  ownerAccountAddress?: string;
-  balanceChange: number;
-  incomingTransactions: Set<string>;
-  outgoingTransactions: Set<string>;
+  ownerAccountAddress: string;
+  incomingTransactions: { [key: string]: TrackedTokenAccountInfoTransaction };
+  outgoingTransactions: { [key: string]: TrackedTokenAccountInfoTransaction };
 };
 
 // Queries bitquery solana.transfers for all token accounts belonging to `tokenMintAddress` with any activity between
@@ -232,6 +244,7 @@ export type BitquerySolanaTrackedTokenAccountInfo = {
 // than the final balance (so this must be combined with some previous call's balance or called multiple times)
 export async function solanaTrackedTokenAccountsInfoBetweenDatesBitquery(
   tokenMintAddress: string,
+  tokenMintDecimals: number,
   startDateInclusive: Date,
   endDateExclusive: Date
 ) {
@@ -257,9 +270,8 @@ export async function solanaTrackedTokenAccountsInfoBetweenDatesBitquery(
       accountInfoMap[result.sender.mintAccount] = {
         tokenAccountAddress: result.sender.mintAccount,
         ownerAccountAddress: result.sender.address,
-        balanceChange: 0,
-        incomingTransactions: new Set<string>(),
-        outgoingTransactions: new Set<string>(),
+        incomingTransactions: {},
+        outgoingTransactions: {},
       };
     }
 
@@ -267,21 +279,27 @@ export async function solanaTrackedTokenAccountsInfoBetweenDatesBitquery(
       accountInfoMap[result.receiver.mintAccount] = {
         tokenAccountAddress: result.receiver.mintAccount,
         ownerAccountAddress: result.receiver.address,
-        balanceChange: 0,
-        incomingTransactions: new Set<string>(),
-        outgoingTransactions: new Set<string>(),
+        incomingTransactions: {},
+        outgoingTransactions: {},
       };
     }
 
-    accountInfoMap[result.sender.mintAccount]!.balanceChange -= result.amount;
-    accountInfoMap[result.receiver.mintAccount]!.balanceChange += result.amount;
+    const decimalsFactor = new BigNumber(10).pow(tokenMintDecimals);
 
-    accountInfoMap[result.sender.mintAccount]!.outgoingTransactions.add(
+    accountInfoMap[result.sender.mintAccount]!.outgoingTransactions[
       result.transaction.signature
-    );
-    accountInfoMap[result.receiver.mintAccount]!.incomingTransactions.add(
+    ] = {
+      hash: result.transaction.signature,
+      transaction_datetime: new Date(result.block.timestamp.iso8601),
+      amount: decimalsFactor.times(result.amount).toString(),
+    };
+    accountInfoMap[result.receiver.mintAccount]!.incomingTransactions[
       result.transaction.signature
-    );
+    ] = {
+      hash: result.transaction.signature,
+      transaction_datetime: new Date(result.block.timestamp.iso8601),
+      amount: decimalsFactor.times(result.amount).toString(),
+    };
   });
 
   console.log(results.length, " results");
@@ -327,17 +345,19 @@ export async function getSolanaTransactionSuccessForHashesBitquery(
     });
 
     // rate limiting here in case we make too many calls
-    await new Promise((f) => setTimeout(f, TIMEOUT_BETWEEN_CALLS));
+    await new Promise((f) => setTimeout(f, BITQUERY_TIMEOUT_BETWEEN_CALLS()));
   }
 
   return hashToSuccessMap;
 }
 
 type BitqueryEthereumTransfer = {
+  // note bitquery returns this as a decimal, e.g. `12.3456` instead of `12345600000` (for 9 decimals)
+  amount: number;
   sender: { address: string };
   receiver: { address: string };
   transaction: { hash: string };
-  block: { height: number; timestamp: { iso8601: Date } };
+  block: { height: number; timestamp: { iso8601: string } };
 };
 
 /** Similar to _solanaTransferAmountsWithFilter but for ethereum
@@ -369,6 +389,7 @@ async function _ethereumTransferAmountsWithFilter(
         currency: {is: $tokenMintAddress}
         success: true
       ) {
+        amount
         sender {
           address
         }
@@ -414,7 +435,7 @@ async function _ethereumTransferAmountsWithFilter(
  */
 export async function getAllEthTokenAddressInfoAndTransactions(
   tokenMintAddress: string,
-  _tokenMintDecimals: number,
+  tokenMintDecimals: number,
   startDateInclusive: Date,
   endDateExclusive: Date
 ): Promise<TrackedTokenAccountInfo[]> {
@@ -454,8 +475,8 @@ export async function getAllEthTokenAddressInfoAndTransactions(
       accountInfoMap[result.sender.address] = {
         tokenAccountAddress: result.sender.address,
         approximateMinimumBalance: addressToBalances[result.sender.address],
-        incomingTransactions: new Set<string>(),
-        outgoingTransactions: new Set<string>(),
+        incomingTransactions: {},
+        outgoingTransactions: {},
       };
     }
 
@@ -463,17 +484,27 @@ export async function getAllEthTokenAddressInfoAndTransactions(
       accountInfoMap[result.receiver.address] = {
         tokenAccountAddress: result.receiver.address,
         approximateMinimumBalance: addressToBalances[result.receiver.address],
-        incomingTransactions: new Set<string>(),
-        outgoingTransactions: new Set<string>(),
+        incomingTransactions: {},
+        outgoingTransactions: {},
       };
     }
 
-    accountInfoMap[result.sender.address]!.outgoingTransactions.add(
+    const decimalsFactor = new BigNumber(10).pow(tokenMintDecimals);
+
+    accountInfoMap[result.sender.address]!.outgoingTransactions[
       result.transaction.hash
-    );
-    accountInfoMap[result.receiver.address]!.incomingTransactions.add(
+    ] = {
+      hash: result.transaction.hash,
+      transaction_datetime: new Date(result.block.timestamp.iso8601),
+      amount: decimalsFactor.times(result.amount).toString(),
+    };
+    accountInfoMap[result.receiver.address]!.incomingTransactions[
       result.transaction.hash
-    );
+    ] = {
+      hash: result.transaction.hash,
+      transaction_datetime: new Date(result.block.timestamp.iso8601),
+      amount: decimalsFactor.times(result.amount).toString(),
+    };
   });
 
   console.log(results.length, " results");
