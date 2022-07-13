@@ -39,11 +39,11 @@ describe("GET /vanity_metrics", () => {
     // secondary check here in the tests
     expect(response.body).to.eql({
       totalTokensTracked: 0,
-      totalWallets: 652_610,
+      totalWallets: 774_600,
       walletsByDay: [],
-      totalTransactions: 19_475_850,
+      totalTransactions: 20_775_850,
       transactionsByDay: [],
-      tvl: 26_000_000,
+      tvl: 27_000_000,
       tvlByDay: [],
     });
   });
