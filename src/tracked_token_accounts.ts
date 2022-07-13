@@ -410,7 +410,7 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
           "transaction_hash",
           "transfer_in",
         ])
-        .ignore(); // can just ignore if we already have this account saved
+        .merge(); // update amount if there's a conflict
     }
   }
 
@@ -428,7 +428,7 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
           "transaction_hash",
           "transfer_in",
         ])
-        .ignore(); // can just ignore if we already have this account saved
+        .merge(); // update amount if there's a conflict
     }
   }
 }

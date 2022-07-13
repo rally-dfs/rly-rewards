@@ -1,13 +1,13 @@
 import * as chai from "chai";
 import chaiExclude from "chai-exclude";
 
-import { stub, SinonStub, match } from "sinon";
+import { stub, SinonStub } from "sinon";
 
 import * as graphql from "../../src/chain-data-utils/graphql";
 import * as chainConstants from "../../src/chain-data-utils/constants";
 import {
-  SOLANA_TRANSFERS_PAGE_ONE,
-  SOLANA_TRANSFERS_PAGE_TWO,
+  BQ_SOL_TRANSFERS_PAGE_ONE,
+  BQ_SOL_TRANSFERS_PAGE_TWO,
   SOLANA_GET_TRANSACTION_ONE,
   SOLANA_GET_TRANSACTION_TWO,
   SOLANA_GET_TRANSACTION_THREE,
@@ -39,10 +39,10 @@ describe("#getAllSolanaTrackedTokenAccountInfoAndTransactions", () => {
     bitqueryGraphqlStub = stub(graphql, "queryGQL");
     bitqueryGraphqlStub
       .onCall(0)
-      .returns(Promise.resolve(SOLANA_TRANSFERS_PAGE_ONE));
+      .returns(Promise.resolve(BQ_SOL_TRANSFERS_PAGE_ONE));
     bitqueryGraphqlStub
       .onCall(1)
-      .returns(Promise.resolve(SOLANA_TRANSFERS_PAGE_TWO));
+      .returns(Promise.resolve(BQ_SOL_TRANSFERS_PAGE_TWO));
     bitqueryGraphqlStub.returns(Promise.resolve(undefined));
 
     solanaGetTransactionStub = stub(

@@ -29,7 +29,9 @@ import { getMultipleSolanaTransactionBalances } from "./solana";
 
 async function _solanaTrackedTokenAccountsInfoBetweenDatesBitquery(
   tokenMintAddress: string,
-  tokenMintDecimals: number,
+  // bitquery returns base units for solana, not sure if it's intentional or not (differs from bitquery's eth response),
+  // but we don't tokenMintDecimals if it is intentional
+  _tokenMintDecimals: number,
   startDateInclusive: Date,
   endDateExclusive: Date
 ) {
@@ -67,21 +69,19 @@ async function _solanaTrackedTokenAccountsInfoBetweenDatesBitquery(
       };
     }
 
-    const decimalsFactor = new BigNumber(10).pow(tokenMintDecimals);
-
     accountInfoMap[result.sender.mintAccount]!.outgoingTransactions[
       result.transaction.signature
     ] = {
       hash: result.transaction.signature,
       transaction_datetime: new Date(result.block.timestamp.iso8601),
-      amount: decimalsFactor.times(result.amount).toString(),
+      amount: result.amount.toString(), // note unlike eth, bitquery returns the base units here instead of decimals
     };
     accountInfoMap[result.receiver.mintAccount]!.incomingTransactions[
       result.transaction.signature
     ] = {
       hash: result.transaction.signature,
       transaction_datetime: new Date(result.block.timestamp.iso8601),
-      amount: decimalsFactor.times(result.amount).toString(),
+      amount: result.amount.toString(),
     };
   });
 
