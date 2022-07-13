@@ -6,19 +6,17 @@ import { stub, SinonStub } from "sinon";
 import * as graphql from "../../src/chain-data-utils/graphql";
 import * as chainConstants from "../../src/chain-data-utils/constants";
 import {
-  SOLANA_TRANSFERS_PAGE_ONE,
-  SOLANA_TRANSFERS_PAGE_TWO,
+  BQ_SOL_TRANSFERS_PAGE_ONE,
+  BQ_SOL_TRANSFERS_PAGE_TWO,
   SOLANA_GET_TRANSACTION_ONE,
   SOLANA_GET_TRANSACTION_TWO,
   SOLANA_GET_TRANSACTION_THREE,
-} from "./combined_queries_stub_data";
-import {
-  TEST_MOCK_ONLY_CONNECTION,
-  TrackedTokenAccountInfo,
-} from "../../src/chain-data-utils/combined_queries";
+} from "./stub_data";
 
 import { getKnex } from "../../src/database";
-import { getAllSolanaTrackedTokenAccountInfoAndTransactions } from "../../src/chain-data-utils/combined_queries";
+import { getAllSolanaTrackedTokenAccountInfoAndTransactions } from "../../src/chain-data-utils/bq_tracked_token_sol";
+import { TEST_MOCK_ONLY_CONNECTION } from "../../src/chain-data-utils/solana";
+import { TrackedTokenAccountInfo } from "../../src/chain-data-utils/bq_tracked_token_base";
 
 chai.use(chaiExclude);
 
@@ -41,10 +39,10 @@ describe("#getAllSolanaTrackedTokenAccountInfoAndTransactions", () => {
     bitqueryGraphqlStub = stub(graphql, "queryGQL");
     bitqueryGraphqlStub
       .onCall(0)
-      .returns(Promise.resolve(SOLANA_TRANSFERS_PAGE_ONE));
+      .returns(Promise.resolve(BQ_SOL_TRANSFERS_PAGE_ONE));
     bitqueryGraphqlStub
       .onCall(1)
-      .returns(Promise.resolve(SOLANA_TRANSFERS_PAGE_TWO));
+      .returns(Promise.resolve(BQ_SOL_TRANSFERS_PAGE_TWO));
     bitqueryGraphqlStub.returns(Promise.resolve(undefined));
 
     solanaGetTransactionStub = stub(
@@ -142,7 +140,7 @@ describe("#getAllSolanaTrackedTokenAccountInfoAndTransactions", () => {
       "tokenmint00000",
       9,
       new Date("2022-06-01T00:00:00Z"),
-      new Date("2022-06-01T23:59:59Z")
+      new Date("2022-06-02T00:00:00Z")
     );
 
     _assertTokenInfoAfterStubbedTransactions(tokenInfo);
@@ -158,7 +156,7 @@ describe("#getAllSolanaTrackedTokenAccountInfoAndTransactions", () => {
       "tokenmint00000",
       9,
       new Date("2022-06-01T00:00:00Z"),
-      new Date("2022-06-01T23:59:59Z")
+      new Date("2022-06-02T00:00:00Z")
     );
 
     // should still get the same token info, inferred from bitquery balance changes and the other 2 txns (since
@@ -182,7 +180,7 @@ describe("#getAllSolanaTrackedTokenAccountInfoAndTransactions", () => {
       "tokenmint00000",
       9,
       new Date("2022-06-01T00:00:00Z"),
-      new Date("2022-06-01T23:59:59Z")
+      new Date("2022-06-02T00:00:00Z")
     );
 
     // should still get the same token info if retry fetch succeeded

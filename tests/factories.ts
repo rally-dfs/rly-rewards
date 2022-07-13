@@ -5,12 +5,16 @@ import { TrackedToken } from "../src/knex-types/tracked_token";
 
 const knex = getKnex();
 
-export async function createTrackedToken(displayName: string, address: string) {
+export async function createTrackedToken(
+  displayName: string,
+  address: string,
+  decimals?: number
+) {
   const mintedTokens = await knex<TrackedToken>("tracked_tokens").insert(
     {
       mint_address: address,
       display_name: displayName,
-      decimals: 8,
+      decimals: decimals || 8,
     },
     "*"
   );
@@ -23,14 +27,15 @@ export async function createTrackedToken(displayName: string, address: string) {
 
 export async function createAccount(
   trackedToken: TrackedToken,
-  date: Date
+  date: Date,
+  addressOverride?: string
 ): Promise<TrackedTokenAccount> {
   const fakeAddressSeed = Math.round(Math.random() * 100);
   const dbResponse = await knex<TrackedTokenAccount>(
     "tracked_token_accounts"
   ).insert(
     {
-      address: fakeAddressSeed.toString(),
+      address: addressOverride || fakeAddressSeed.toString(),
       owner_address: fakeAddressSeed.toString(),
       token_id: trackedToken.id,
       first_transaction_date: date,

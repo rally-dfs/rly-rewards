@@ -1,10 +1,10 @@
 // copied structure from bitquery with values changed for readability
 // (obviously these hashes aren't long enough to be real pubkeys but it's much more readable this way)
-export const SOLANA_TRANSFERS_PAGE_ONE = {
+export const BQ_SOL_TRANSFERS_PAGE_ONE = {
   solana: {
     transfers: [
       {
-        amount: 1.111_111_111,
+        amount: 1_111_111_111, // note this is base units instead of decimals, unlike eth
         transferType: "transfer",
         transaction: {
           signature: "signature11111",
@@ -27,7 +27,7 @@ export const SOLANA_TRANSFERS_PAGE_ONE = {
         },
       },
       {
-        amount: 2.222_222_222,
+        amount: 2_222_222_222,
         transferType: "transfer",
         transaction: {
           signature: "signature22222",
@@ -53,11 +53,11 @@ export const SOLANA_TRANSFERS_PAGE_ONE = {
   },
 };
 
-export const SOLANA_TRANSFERS_PAGE_TWO = {
+export const BQ_SOL_TRANSFERS_PAGE_TWO = {
   solana: {
     transfers: [
       {
-        amount: 3.333_333_333,
+        amount: 3_333_333_333,
         transferType: "transfer",
         transaction: {
           signature: "signature33333",
@@ -72,6 +72,75 @@ export const SOLANA_TRANSFERS_PAGE_TWO = {
           address: "ownerAAAAA",
           mintAccount: "tokenaccountAAAAA",
           type: "account",
+        },
+        block: {
+          timestamp: {
+            iso8601: "2022-06-01T00:03:00Z",
+          },
+        },
+      },
+    ],
+  },
+};
+
+// copied structure from bitquery with values changed for readability
+// (obviously these hashes aren't long enough to be real pubkeys but it's much more readable this way)
+// this is basically the same as BQ_SOL_TRANSFERS_FOO except that amount is a decimal instead of base units (bitquery
+// is inconsistent between the two, so we match the responses here)
+export const BQ_ETH_TRANSFERS_PAGE_ONE = {
+  ethereum: {
+    transfers: [
+      {
+        amount: 1.111_111_111_111, // note this is decimal instead of base units, unlike solana (and always to 12 decimals)
+        sender: {
+          address: "addressAAAAA",
+        },
+        receiver: {
+          address: "addressBBBBB",
+        },
+        transaction: {
+          hash: "signature11111",
+        },
+        block: {
+          timestamp: {
+            iso8601: "2022-06-01T00:01:00Z",
+          },
+        },
+      },
+      {
+        amount: 2.222_222_222_222,
+        sender: {
+          address: "addressCCCCC",
+        },
+        receiver: {
+          address: "addressAAAAA",
+        },
+        transaction: {
+          hash: "signature22222",
+        },
+        block: {
+          timestamp: {
+            iso8601: "2022-06-01T00:02:00Z",
+          },
+        },
+      },
+    ],
+  },
+};
+
+export const BQ_ETH_TRANSFERS_PAGE_TWO = {
+  ethereum: {
+    transfers: [
+      {
+        amount: 3.333_333_333_333,
+        sender: {
+          address: "addressBBBBB",
+        },
+        receiver: {
+          address: "addressAAAAA",
+        },
+        transaction: {
+          hash: "signature33333",
         },
         block: {
           timestamp: {

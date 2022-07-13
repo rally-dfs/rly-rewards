@@ -2,7 +2,7 @@ import * as chai from "chai";
 import chaiExclude from "chai-exclude";
 
 import { stub, SinonStub } from "sinon";
-import * as queries from "../src/chain-data-utils/combined_queries";
+import * as bitquery from "../src/chain-data-utils/bq_tracked_token_sol";
 
 import { getKnex } from "../src/database";
 import { getAllTrackedTokenAccountInfoAndTransactionsForEndDate } from "../src/tracked_token_accounts";
@@ -18,7 +18,7 @@ const knex = getKnex();
 
 describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
   let tokenId: number;
-  let queriesStub: SinonStub;
+  let bitqueryStub: SinonStub;
   let tokenAccounts: TrackedTokenAccount[];
 
   // stub out getAllSolanaTrackedTokenAccountInfoAndTransactions
@@ -32,13 +32,13 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
     );
     tokenId = tokenInsert[0]!.id!;
 
-    queriesStub = stub(
-      queries,
+    bitqueryStub = stub(
+      bitquery,
       "getAllSolanaTrackedTokenAccountInfoAndTransactions"
     );
 
     // two accounts on first call (6/1)
-    queriesStub.onCall(0).returns(
+    bitqueryStub.onCall(0).returns(
       Promise.resolve([
         {
           tokenAccountAddress: "account1",
@@ -82,7 +82,7 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
     );
 
     // one new account on second call (6/2)
-    queriesStub.onCall(1).returns(
+    bitqueryStub.onCall(1).returns(
       Promise.resolve([
         {
           tokenAccountAddress: "account1",
@@ -126,7 +126,7 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
     );
 
     // one new account on third call (6/2)
-    queriesStub.onCall(2).returns(
+    bitqueryStub.onCall(2).returns(
       Promise.resolve([
         {
           tokenAccountAddress: "account3",
@@ -171,7 +171,7 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
   });
 
   afterEach(async () => {
-    queriesStub.restore();
+    bitqueryStub.restore();
   });
 
   describe("Call with only a single day", () => {
@@ -337,7 +337,7 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
     });
 
     afterEach(async () => {
-      queriesStub.restore();
+      bitqueryStub.restore();
     });
 
     it("saves tracked token accounts for multiple days", async () => {
