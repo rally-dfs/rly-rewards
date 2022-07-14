@@ -47,18 +47,20 @@ describe("#getAllSolanaTrackedTokenAccountInfoAndTransactions", () => {
 
     solanaGetTransactionStub = stub(
       TEST_MOCK_ONLY_CONNECTION,
-      "getTransaction"
+      "getTransactions"
+    ).callsFake((signatures, _commitment) =>
+      Promise.resolve(
+        // signatures can be passed into getTransaction in any order so make sure to return responses in the same order
+        signatures.map(
+          (signature) =>
+            ({
+              signature11111: SOLANA_GET_TRANSACTION_ONE,
+              signature22222: SOLANA_GET_TRANSACTION_TWO,
+              signature33333: SOLANA_GET_TRANSACTION_THREE,
+            }[signature])
+        )
+      )
     );
-    solanaGetTransactionStub
-      .withArgs("signature11111")
-      .returns(Promise.resolve(SOLANA_GET_TRANSACTION_ONE));
-    solanaGetTransactionStub
-      .withArgs("signature22222")
-      .returns(Promise.resolve(SOLANA_GET_TRANSACTION_TWO));
-    solanaGetTransactionStub
-      .withArgs("signature33333")
-      .returns(Promise.resolve(SOLANA_GET_TRANSACTION_THREE));
-    solanaGetTransactionStub.returns(Promise.resolve(null));
   });
 
   afterEach(async () => {
