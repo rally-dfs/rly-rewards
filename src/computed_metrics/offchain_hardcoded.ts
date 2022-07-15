@@ -17,6 +17,7 @@ const TXN_COUNTS = {
 
 // these numbers should be post-decimals (not on chain units)
 const TVL_AMOUNTS = {
+  Rallyio: 3_141_000 + 88_700_000 + 9_819_000 + 870_000 + 6_000,
   JoyrideSolitaire: 27_000_000,
 };
 
