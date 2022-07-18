@@ -20,7 +20,8 @@ import { getAllEthTokenAddressInfoAndTransactions } from "./chain-data-utils/bq_
  */
 export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
   lastEndDateString: string,
-  forceOneDay: boolean
+  forceOneDay: boolean,
+  tokenId?: string
 ) {
   const knex = getKnex();
 
@@ -30,14 +31,7 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
   // tracked_token_account_balances and tracked_token_account_transactions below but we could probably avoid this if we did more
   // some complex insert queries , e.g. with a subtable and something looking like this (psuedo code)
   // `WITH values_subtable ... INSERT INTO tracked_token_account_balances SELECT ... FROM tracked_token_accounts JOIN values_subtable`
-  const allTrackedTokenAccounts: {
-    token_id: number;
-    mint_address: string;
-    decimals: number;
-    chain: TrackedTokenChain;
-    account_id: number;
-    account_address: string;
-  }[] = await knex("tracked_tokens")
+  let trackedTokenAccountsQuery = knex("tracked_tokens")
     .leftJoin(
       "tracked_token_accounts",
       "tracked_tokens.id",
@@ -51,6 +45,22 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
       "tracked_token_accounts.id as account_id",
       "tracked_token_accounts.address as account_address"
     );
+
+  if (tokenId) {
+    trackedTokenAccountsQuery = trackedTokenAccountsQuery.where(
+      "token_id",
+      tokenId
+    );
+  }
+
+  const allTrackedTokenAccounts: {
+    token_id: number;
+    mint_address: string;
+    decimals: number;
+    chain: TrackedTokenChain;
+    account_id: number;
+    account_address: string;
+  }[] = await trackedTokenAccountsQuery;
 
   // {token_id: {address: "...", decimals: 9, chain: "solana", accountIdsByAddress: {account_address: account_id}}}
   // make a dictionary to quickly look up info by mint and account PKs for below
