@@ -1,13 +1,15 @@
+import { LiquidityCollateralTokenChain } from "../knex-types/liquidity_collateral_token";
 import { queryBitqueryGQL } from "./bq_helpers";
 import { BITQUERY_TIMEOUT_BETWEEN_CALLS } from "./constants";
 import { getSolanaTransaction } from "./solana";
+import { getERC20BalanceAtBlock } from "./ethereum";
 
 /** Queries bitquery solana.transfers for `ownerAddress` with an end date of `endDateExclusive` (any transactions
  * exactly on endDateExclusive will not be counted)
  * Since bitquery results don't contain the date information and aren't guaranteed to be sorted, this is best used in
  * conjunction with tokenAccountBalanceOnDateSolanaFm to just make sure there isn't anything missing in solana.fm
  */
-async function _lastTransactionBetweenDatesBitquery(
+async function _lastSolanaTransactionBetweenDatesBitquery(
   tokenAccountOwnerAddress: string,
   tokenMintAddress: string,
   startDateInclusive: Date,
@@ -106,15 +108,15 @@ async function _lastTransactionBetweenDatesBitquery(
     )[0]?.transaction.signature;
 }
 
-async function _tokenAccountBalanceOnDate(
+async function _solanaTokenAccountBalanceOnDate(
   tokenAccountOwnerAddress: string,
   tokenMintAddress: string,
   endDateExclusive: Date,
-  previousBalance: number,
+  previousBalance: string,
   previousEndDateExclusive: Date
 ) {
   // load all transfers in
-  const latestTxnHash = await _lastTransactionBetweenDatesBitquery(
+  const latestTxnHash = await _lastSolanaTransactionBetweenDatesBitquery(
     tokenAccountOwnerAddress,
     tokenMintAddress,
     previousEndDateExclusive,
@@ -122,7 +124,6 @@ async function _tokenAccountBalanceOnDate(
   );
 
   if (latestTxnHash === undefined) {
-    // both solana.fm and bitquery didn't return any txns, likely just no txns on that day
     return previousBalance;
   }
 
@@ -144,12 +145,163 @@ async function _tokenAccountBalanceOnDate(
     console.error("Found more than 1 token account for txn", latestTxnHash);
   }
 
-  return parseInt(balances[0]!.uiTokenAmount.amount);
+  return balances[0]!.uiTokenAmount.amount;
+}
+
+async function _lastEthTransactionBlockBetweenDatesBitquery(
+  tokenAccountAddress: string,
+  tokenMintAddress: string,
+  startDateInclusive: Date,
+  endDateExclusive: Date
+) {
+  // bitquery treats endDate as inclusive, so we need to subtract 1 millisecond from endDateExclusive
+  // (bitquery doesn't have sub-second precision anyway and seems to just drop any milliseconds passed in, so this
+  // is basically the same as subtracting 1 second, i.e. we should be calling T00:00:00Z to T23:59:59Z instead of
+  // T00:00:00Z to T00:00:00Z to avoid duplicates/undercounting
+  const endDateInclusive = new Date(endDateExclusive.valueOf() - 1);
+
+  const variables = {
+    startTime: startDateInclusive.toISOString(),
+    endTime: endDateInclusive.toISOString(),
+    tokenMintAddress: tokenMintAddress,
+    tokenAccountAddress: tokenAccountAddress,
+  };
+
+  const senderTransactionQuery = `query EthTransfersForSenderToken(
+      $startTime: ISO8601DateTime!, $endTime: ISO8601DateTime!, $tokenMintAddress: String!,
+      $tokenAccountAddress: String!) {
+    ethereum {
+      transfers(
+        options: {limit: 1, desc: "block.timestamp.iso8601"}
+        time: {between: [$startTime, $endTime]}
+        currency: {is: $tokenMintAddress}
+        sender: {is: $tokenAccountAddress}
+        success: true
+      ) {
+        transaction {
+          hash
+        }
+        block {
+          height
+          timestamp {
+            iso8601
+          }
+        }
+      }
+    }
+  }`;
+
+  const senderData = await queryBitqueryGQL(senderTransactionQuery, variables);
+
+  const senderTransfers: {
+    transaction: { signature: string };
+    block: { height: number; timestamp: { iso8601: string } };
+  }[] = senderData["ethereum"]["transfers"];
+
+  // same as sender but with `receiver:` filter
+  const receiverTransactionQuery = `query EthTransfersForReceiverToken(
+      $startTime: ISO8601DateTime!, $endTime: ISO8601DateTime!, $tokenMintAddress: String!,
+      $tokenAccountAddress: String!) {
+    ethereum {
+      transfers(
+        options: {limit: 1, desc: "block.timestamp.iso8601"}
+        time: {between: [$startTime, $endTime]}
+        currency: {is: $tokenMintAddress}
+        receiver: {is: $tokenAccountAddress}
+        success: true
+      ) {
+        transaction {
+          hash
+        }
+        block {
+          height
+          timestamp {
+            iso8601
+          }
+        }
+      }
+    }
+  }`;
+
+  const receiverData = await queryBitqueryGQL(
+    receiverTransactionQuery,
+    variables
+  );
+
+  const receiverTransfers: {
+    transaction: { signature: string };
+    block: { height: number; timestamp: { iso8601: string } };
+  }[] = receiverData["ethereum"]["transfers"];
+
+  // get the most recent block height
+  return senderTransfers
+    .concat(receiverTransfers)
+    .sort(
+      (transfer1, transfer2) =>
+        new Date(transfer2.block.timestamp.iso8601).getTime() -
+        new Date(transfer1.block.timestamp.iso8601).getTime()
+    )[0]?.block.height;
+}
+
+async function _ethTokenAccountBalanceOnDate(
+  tokenAccountAddress: string,
+  tokenMintAddress: string,
+  endDateExclusive: Date,
+  previousBalance: string,
+  previousEndDateExclusive: Date
+) {
+  const latestBlockHeight = await _lastEthTransactionBlockBetweenDatesBitquery(
+    tokenAccountAddress,
+    tokenMintAddress,
+    previousEndDateExclusive,
+    endDateExclusive
+  );
+
+  if (latestBlockHeight === undefined) {
+    return previousBalance;
+  }
+
+  return await getERC20BalanceAtBlock(
+    tokenMintAddress,
+    tokenAccountAddress,
+    latestBlockHeight
+  );
+}
+
+/** Just a readability helper function for triaging by chain */
+function _tokenAccountBalanceOnDate(
+  tokenAccountAddress: string,
+  tokenAccountOwnerAddress: string,
+  tokenMintAddress: string,
+  chain: LiquidityCollateralTokenChain,
+  currentEndDateExclusive: Date,
+  previousBalance: string,
+  previousEndDateExclusive: Date
+) {
+  if (chain === "solana") {
+    return _solanaTokenAccountBalanceOnDate(
+      tokenAccountOwnerAddress, // bq requires owner address for solana, not the actual address
+      tokenMintAddress,
+      currentEndDateExclusive,
+      previousBalance,
+      previousEndDateExclusive
+    );
+  } else if (chain === "ethereum") {
+    return _ethTokenAccountBalanceOnDate(
+      tokenAccountAddress, // bq requires actual address for eth (obviously)
+      tokenMintAddress,
+      currentEndDateExclusive,
+      previousBalance,
+      previousEndDateExclusive
+    );
+  } else {
+    throw new Error(`Invalid chain ${chain}`);
+  }
 }
 
 export type TokenBalanceDate = {
   dateExclusive: Date;
-  balance: number;
+  balance: string;
 };
 
 // Calls tokenAccountBalanceOnDate for all balances between startDate and endDate.
@@ -158,15 +310,17 @@ export type TokenBalanceDate = {
 // Currently just returns an array of TokenBalanceDate but this probably will eventually be called to backfill
 // all the dates for a token in the DB or something.
 export async function getDailyTokenBalancesBetweenDates(
+  tokenAccountAddress: string,
   tokenAccountOwnerAddress: string,
   tokenMintAddress: string,
+  chain: LiquidityCollateralTokenChain,
   earliestEndDateExclusive: Date,
   latestEndDateExclusive: Date
 ) {
   let allBalances: Array<TokenBalanceDate> = [];
 
   // 0 + a date assumes the all activity happened after that date
-  let previousBalance = 0;
+  let previousBalance = "0";
   // Dec 2021 was when sRLY was minted, probably an okay default
   let previousEndDateExclusive = new Date("2021-12-19T00:00:00Z");
 
@@ -183,14 +337,14 @@ export async function getDailyTokenBalancesBetweenDates(
 
     try {
       let balance = await _tokenAccountBalanceOnDate(
+        tokenAccountAddress,
         tokenAccountOwnerAddress,
         tokenMintAddress,
+        chain,
         currentEndDateExclusive,
         previousBalance,
         previousEndDateExclusive
       );
-
-      console.log(currentEndDateExclusive, "balance = ", balance);
 
       if (balance === undefined || balance === null) {
         throw new Error();

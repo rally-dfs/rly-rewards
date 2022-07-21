@@ -149,8 +149,10 @@ describe("#getDailyTokenBalancesBetweenDates", () => {
 
   it("Returns balance for most recent transaction", async () => {
     const balances = await getDailyTokenBalancesBetweenDates(
+      "", // tokenAccountAddress not used for solana
       "ownerAAAAA", // make sure to use ownerAAAAA, since that's the only address in all 3 txns
       "tokenmint00000",
+      "solana",
       new Date("2022-06-01T00:00:00Z"), // make sure we use endDateExclusive here
       new Date("2022-06-03T00:00:00Z")
     );
@@ -158,17 +160,17 @@ describe("#getDailyTokenBalancesBetweenDates", () => {
       // 6/1 should have signature22222 (the later txn)'s balance
       {
         dateExclusive: new Date("2022-06-01T00:00:00Z"),
-        balance: 12222222222,
+        balance: "12222222222",
       },
       // 6/2 should have signature11111 (the later txn)'s balance
       {
         dateExclusive: new Date("2022-06-02T00:00:00Z"),
-        balance: 10000000000,
+        balance: "10000000000",
       },
       // 6/3 should have signature33333 (the later txn)'s balance
       {
         dateExclusive: new Date("2022-06-03T00:00:00Z"),
-        balance: 15555555555,
+        balance: "15555555555",
       },
     ]);
   });
