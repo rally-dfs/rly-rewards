@@ -43,7 +43,7 @@ describe("GET /vanity_metrics", () => {
       walletsByDay: [],
       totalTransactions: 20_775_850,
       transactionsByDay: [],
-      tvl: 129_536_000,
+      tvl: 27_000_000,
       tvlByDay: [],
     });
   });
