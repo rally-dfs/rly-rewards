@@ -1,5 +1,5 @@
 import { getKnex } from "./database";
-import { getDailyTokenBalancesBetweenDates } from "./chain-data-utils/bq_liquidity_pool";
+import { getDailyTokenBalancesBetweenDates } from "./chain-data-utils/bq_liquidity_pool_base";
 import { LiquidityPoolBalance } from "./knex-types/liquidity_pool_balance";
 import { LiquidityCollateralTokenChain } from "./knex-types/liquidity_collateral_token";
 

@@ -14,7 +14,7 @@ import {
 import * as ethereum from "../../src/chain-data-utils/ethereum";
 
 import { getKnex } from "../../src/database";
-import { getDailyTokenBalancesBetweenDates } from "../../src/chain-data-utils/bq_liquidity_pool";
+import { getDailyTokenBalancesBetweenDates } from "../../src/chain-data-utils/bq_liquidity_pool_base";
 import { TEST_MOCK_ONLY_CONNECTION } from "../../src/chain-data-utils/solana";
 
 chai.use(chaiExclude);
