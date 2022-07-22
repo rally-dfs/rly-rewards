@@ -1,5 +1,4 @@
 import { queryBitqueryGQL } from "./bq_helpers";
-import { BITQUERY_TIMEOUT_BETWEEN_CALLS } from "./constants";
 import { getSolanaTransaction } from "./solana";
 
 /** Queries bitquery solana.transfers for `ownerAddress` with an end date of `endDateExclusive` (any transactions
@@ -7,7 +6,7 @@ import { getSolanaTransaction } from "./solana";
  * Since bitquery results don't contain the date information and aren't guaranteed to be sorted, this is best used in
  * conjunction with tokenAccountBalanceOnDateSolanaFm to just make sure there isn't anything missing in solana.fm
  */
-async function _lastTransactionBetweenDatesBitquery(
+async function _lastSolanaTransactionBetweenDatesBitquery(
   tokenAccountOwnerAddress: string,
   tokenMintAddress: string,
   startDateInclusive: Date,
@@ -106,15 +105,15 @@ async function _lastTransactionBetweenDatesBitquery(
     )[0]?.transaction.signature;
 }
 
-async function _tokenAccountBalanceOnDate(
+export async function solanaTokenAccountBalanceOnDate(
   tokenAccountOwnerAddress: string,
   tokenMintAddress: string,
   endDateExclusive: Date,
-  previousBalance: number,
+  previousBalance: string,
   previousEndDateExclusive: Date
 ) {
   // load all transfers in
-  const latestTxnHash = await _lastTransactionBetweenDatesBitquery(
+  const latestTxnHash = await _lastSolanaTransactionBetweenDatesBitquery(
     tokenAccountOwnerAddress,
     tokenMintAddress,
     previousEndDateExclusive,
@@ -122,7 +121,6 @@ async function _tokenAccountBalanceOnDate(
   );
 
   if (latestTxnHash === undefined) {
-    // both solana.fm and bitquery didn't return any txns, likely just no txns on that day
     return previousBalance;
   }
 
@@ -144,89 +142,5 @@ async function _tokenAccountBalanceOnDate(
     console.error("Found more than 1 token account for txn", latestTxnHash);
   }
 
-  return parseInt(balances[0]!.uiTokenAmount.amount);
-}
-
-export type TokenBalanceDate = {
-  dateExclusive: Date;
-  balance: number;
-};
-
-// Calls tokenAccountBalanceOnDate for all balances between startDate and endDate.
-// Like tokenAccountBalanceOnDate, endDate is exclusive (any transactions exactly on endDateExclusive will
-// not be counted and will be included in the next day instead)
-// Currently just returns an array of TokenBalanceDate but this probably will eventually be called to backfill
-// all the dates for a token in the DB or something.
-export async function getDailyTokenBalancesBetweenDates(
-  tokenAccountOwnerAddress: string,
-  tokenMintAddress: string,
-  earliestEndDateExclusive: Date,
-  latestEndDateExclusive: Date
-) {
-  let allBalances: Array<TokenBalanceDate> = [];
-
-  // 0 + a date assumes the all activity happened after that date
-  let previousBalance = 0;
-  // Dec 2021 was when sRLY was minted, probably an okay default
-  let previousEndDateExclusive = new Date("2021-12-19T00:00:00Z");
-
-  let currentEndDateExclusive = new Date(earliestEndDateExclusive);
-
-  while (currentEndDateExclusive <= latestEndDateExclusive) {
-    console.log(
-      "fetching date",
-      currentEndDateExclusive,
-      "prev date bal",
-      previousEndDateExclusive,
-      previousBalance
-    );
-
-    try {
-      let balance = await _tokenAccountBalanceOnDate(
-        tokenAccountOwnerAddress,
-        tokenMintAddress,
-        currentEndDateExclusive,
-        previousBalance,
-        previousEndDateExclusive
-      );
-
-      console.log(currentEndDateExclusive, "balance = ", balance);
-
-      if (balance === undefined || balance === null) {
-        throw new Error();
-      }
-
-      allBalances.push({
-        dateExclusive: currentEndDateExclusive,
-        balance: balance,
-      });
-
-      previousEndDateExclusive = new Date(currentEndDateExclusive);
-      previousBalance = balance;
-    } catch (error) {
-      console.error(
-        "Error fetching balance",
-        tokenAccountOwnerAddress,
-        currentEndDateExclusive,
-        previousEndDateExclusive,
-        error
-      );
-
-      // just don't add anything to allBalances, it's ok if there's a gap in dates
-      // also leave previousDate/previousBalance the same, can try again from the existing previousDate on the next loop
-    }
-
-    // since endDate is exclusive and startDate is inclusive (in the call to _transferAmountsWithFilter inside
-    // tokenAccountBalanceOnDateBitquery), we can just +1 day here safely without double counting anything
-    currentEndDateExclusive = new Date(
-      currentEndDateExclusive.valueOf() + 86400000 // this doesn't work if we need a DST timezone like PST/PDT
-    );
-
-    // rate limiting in case we make too many calls
-    await new Promise((f) => setTimeout(f, BITQUERY_TIMEOUT_BETWEEN_CALLS()));
-  }
-
-  console.log("balances", allBalances);
-
-  return allBalances;
+  return balances[0]!.uiTokenAmount.amount;
 }
