@@ -14,7 +14,10 @@ import {
   totalTransactions,
   transactionsByDay,
 } from "./computed_metrics/transaction_metrics";
-import { totalRLYRewardsDistributed } from "./computed_metrics/rewards_distributed";
+import {
+  rlyRewardsDistributedByWeek,
+  totalRLYRewardsDistributed,
+} from "./computed_metrics/rewards_distributed";
 import { getOffchainHardcodedData } from "./computed_metrics/offchain_hardcoded";
 
 const routes = Router();
@@ -41,6 +44,7 @@ routes.get("/vanity_metrics", async (_req, res) => {
     onchainTvl,
     tvlByDay,
     totalRewardsDistributed,
+    rewardsByWeek,
   ] = await Promise.all([
     totalWallets(allTrackedTokens),
     totalWalletsByDay(allTrackedTokens),
@@ -49,6 +53,7 @@ routes.get("/vanity_metrics", async (_req, res) => {
     totalValueLockedInPools(allLiquidityCollateralTokens),
     valueLockedByDay(allLiquidityCollateralTokens),
     totalRLYRewardsDistributed(),
+    rlyRewardsDistributedByWeek(),
   ]);
 
   // add the hardcoded metrics for vanity only
@@ -67,6 +72,7 @@ routes.get("/vanity_metrics", async (_req, res) => {
     tvl: tvl,
     tvlByDay: tvlByDay,
     totalRewards: totalRewardsDistributed,
+    rewardsByWeek,
   });
 });
 
