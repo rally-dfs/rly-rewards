@@ -15,7 +15,7 @@ import {
 
 import { getKnex } from "../../src/database";
 import { getAllSolanaTrackedTokenAccountInfoAndTransactions } from "../../src/chain-data-utils/bq_tracked_token_sol";
-import { TEST_MOCK_ONLY_CONNECTION } from "../../src/chain-data-utils/solana";
+import * as solanaConnection from "../../src/chain-data-utils/solana_connection";
 import { TrackedTokenAccountInfo } from "../../src/chain-data-utils/bq_tracked_token_base";
 
 chai.use(chaiExclude);
@@ -46,9 +46,9 @@ describe("#getAllSolanaTrackedTokenAccountInfoAndTransactions", () => {
     bitqueryGraphqlStub.returns(Promise.resolve(undefined));
 
     solanaGetTransactionStub = stub(
-      TEST_MOCK_ONLY_CONNECTION,
-      "getTransactions"
-    ).callsFake((signatures, _commitment) =>
+      solanaConnection,
+      "getTransactionsTriaged"
+    ).callsFake((signatures) =>
       Promise.resolve(
         // signatures can be passed into getTransaction in any order so make sure to return responses in the same order
         signatures.map(

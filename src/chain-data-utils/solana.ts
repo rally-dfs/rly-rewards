@@ -1,15 +1,10 @@
-import { Connection } from "@solana/web3.js";
-
-const endpoint = "https://ssc-dao.genesysgo.net/";
-const connection = new Connection(endpoint, "finalized");
-
-// just exported for test mocking, shouldn't be needed in any real code
-export const TEST_MOCK_ONLY_CONNECTION = connection;
+import {
+  getTransactionsTriaged,
+  getTransactionTriaged,
+} from "./solana_connection";
 
 export async function getSolanaTransaction(hash: string) {
-  return connection.getTransaction(hash, {
-    commitment: "confirmed",
-  });
+  return getTransactionTriaged(hash);
 }
 
 /** Calls solana `getTransaction` in a loop and returns the desired accounts' postBalances.
@@ -27,16 +22,13 @@ export async function getMultipleSolanaTransactionBalances(
   const results: { [key: string]: { [key: string]: number } } = {};
   const retries: { [key: string]: string[] } = {};
 
-  const chunkSize = 200;
+  const chunkSize = 20;
 
   const txnHashes = Object.keys(txnInfos);
 
   for (let i = 0; i < txnHashes.length; i += chunkSize) {
     const hashesChunk = txnHashes.slice(i, i + chunkSize);
-    const transactions = await connection.getTransactions(
-      hashesChunk,
-      "confirmed"
-    );
+    const transactions = await getTransactionsTriaged(hashesChunk);
 
     transactions.forEach((txnInfo, index) => {
       const hash = hashesChunk[index]!;

@@ -12,10 +12,10 @@ import {
 } from "./stub_data";
 
 import * as ethereum from "../../src/chain-data-utils/ethereum";
+import * as solanaConnection from "../../src/chain-data-utils/solana_connection";
 
 import { getKnex } from "../../src/database";
 import { getDailyTokenBalancesBetweenDates } from "../../src/chain-data-utils/bq_liquidity_pool_base";
-import { TEST_MOCK_ONLY_CONNECTION } from "../../src/chain-data-utils/solana";
 
 chai.use(chaiExclude);
 
@@ -214,8 +214,8 @@ describe("#getDailyTokenBalancesBetweenDates", () => {
 
     beforeEach(async () => {
       solanaGetTransactionStub = stub(
-        TEST_MOCK_ONLY_CONNECTION,
-        "getTransaction"
+        solanaConnection,
+        "getTransactionTriaged"
       );
       solanaGetTransactionStub
         .withArgs("signature11111")
