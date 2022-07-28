@@ -1,10 +1,9 @@
 import { queryBitqueryGQL } from "./bq_helpers";
 import { getERC20BalanceAtBlock } from "./ethereum";
 
-async function _lastEthTransactionBlockBetweenDatesBitquery(
+async function _lastEthTransactionBlockBeforeDateBitquery(
   tokenAccountAddress: string,
   tokenMintAddress: string,
-  startDateInclusive: Date,
   endDateExclusive: Date
 ) {
   // bitquery treats endDate as inclusive, so we need to subtract 1 millisecond from endDateExclusive
@@ -14,19 +13,18 @@ async function _lastEthTransactionBlockBetweenDatesBitquery(
   const endDateInclusive = new Date(endDateExclusive.valueOf() - 1);
 
   const variables = {
-    startTime: startDateInclusive.toISOString(),
     endTime: endDateInclusive.toISOString(),
     tokenMintAddress: tokenMintAddress,
     tokenAccountAddress: tokenAccountAddress,
   };
 
   const senderTransactionQuery = `query EthTransfersForSenderToken(
-      $startTime: ISO8601DateTime!, $endTime: ISO8601DateTime!, $tokenMintAddress: String!,
+      $endTime: ISO8601DateTime!, $tokenMintAddress: String!,
       $tokenAccountAddress: String!) {
     ethereum {
       transfers(
         options: {limit: 1, desc: "block.timestamp.iso8601"}
-        time: {between: [$startTime, $endTime]}
+        time: {before: $endTime}
         currency: {is: $tokenMintAddress}
         sender: {is: $tokenAccountAddress}
         success: true
@@ -53,12 +51,12 @@ async function _lastEthTransactionBlockBetweenDatesBitquery(
 
   // same as sender but with `receiver:` filter
   const receiverTransactionQuery = `query EthTransfersForReceiverToken(
-      $startTime: ISO8601DateTime!, $endTime: ISO8601DateTime!, $tokenMintAddress: String!,
+      $endTime: ISO8601DateTime!, $tokenMintAddress: String!,
       $tokenAccountAddress: String!) {
     ethereum {
       transfers(
         options: {limit: 1, desc: "block.timestamp.iso8601"}
-        time: {between: [$startTime, $endTime]}
+        time: {before: $endTime}
         currency: {is: $tokenMintAddress}
         receiver: {is: $tokenAccountAddress}
         success: true
@@ -100,13 +98,11 @@ export async function ethTokenAccountBalanceOnDate(
   tokenAccountAddress: string,
   tokenMintAddress: string,
   endDateExclusive: Date,
-  previousBalance: string,
-  previousEndDateExclusive: Date
+  previousBalance: string
 ) {
-  const latestBlockHeight = await _lastEthTransactionBlockBetweenDatesBitquery(
+  const latestBlockHeight = await _lastEthTransactionBlockBeforeDateBitquery(
     tokenAccountAddress,
     tokenMintAddress,
-    previousEndDateExclusive,
     endDateExclusive
   );
 
