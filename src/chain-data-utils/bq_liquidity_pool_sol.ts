@@ -107,7 +107,7 @@ export async function solanaTokenAccountBalanceOnDate(
   tokenAccountOwnerAddress: string,
   tokenMintAddress: string,
   endDateExclusive: Date,
-  previousBalance: string
+  previousBalance?: string
 ) {
   // load all transfers in
   const latestTxnHash = await _lastSolanaTransactionBeforeDateBitquery(

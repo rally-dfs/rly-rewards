@@ -98,7 +98,7 @@ export async function ethTokenAccountBalanceOnDate(
   tokenAccountAddress: string,
   tokenMintAddress: string,
   endDateExclusive: Date,
-  previousBalance: string
+  previousBalance?: string
 ) {
   const latestBlockHeight = await _lastEthTransactionBlockBeforeDateBitquery(
     tokenAccountAddress,

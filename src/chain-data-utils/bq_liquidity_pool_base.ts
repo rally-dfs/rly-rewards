@@ -10,7 +10,7 @@ function _tokenAccountBalanceOnDate(
   tokenMintAddress: string,
   chain: LiquidityCollateralTokenChain,
   currentEndDateExclusive: Date,
-  previousBalance: string
+  previousBalance?: string
 ) {
   if (chain === "solana") {
     return solanaTokenAccountBalanceOnDate(
@@ -51,8 +51,7 @@ export async function getDailyTokenBalancesBetweenDates(
 ) {
   let allBalances: Array<TokenBalanceDate> = [];
 
-  // 0 + a date assumes the all activity happened after that date
-  let previousBalance = "0";
+  let previousBalance = undefined;
 
   let currentEndDateExclusive = new Date(earliestEndDateExclusive);
 
@@ -65,7 +64,7 @@ export async function getDailyTokenBalancesBetweenDates(
     );
 
     try {
-      let balance = await _tokenAccountBalanceOnDate(
+      const balance: string | undefined = await _tokenAccountBalanceOnDate(
         tokenAccountAddress,
         tokenAccountOwnerAddress,
         tokenMintAddress,
