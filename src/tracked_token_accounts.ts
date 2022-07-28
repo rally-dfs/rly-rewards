@@ -27,6 +27,10 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
 
   const lastEndDate = new Date(`${lastEndDateString}T00:00:00Z`);
 
+  if (lastEndDate > new Date()) {
+    throw new Error(`End date is in the future`);
+  }
+
   // TODO: this is a pretty huge query, it's mostly needed to map token_address => ids when inserting into
   // tracked_token_account_balances and tracked_token_account_transactions below but we could probably avoid this if we did more
   // some complex insert queries , e.g. with a subtable and something looking like this (psuedo code)

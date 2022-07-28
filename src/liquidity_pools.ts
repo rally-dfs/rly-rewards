@@ -56,10 +56,13 @@ export async function getDailyTokenBalances(
   const latestEndDate = new Date(`${latestEndDateString}T00:00:00Z`);
 
   if (latestEndDate.valueOf() < earliestEndDate.valueOf()) {
-    console.log(
-      `invalid date range ${earliestEndDate} to ${latestEndDate}, no data to fetch`
+    throw new Error(
+      `Invalid date range ${earliestEndDate} to ${latestEndDate}, no data to fetch`
     );
-    return;
+  }
+
+  if (latestEndDate > new Date()) {
+    throw new Error(`End date is in the future`);
   }
 
   let query = knex("liquidity_pools")
