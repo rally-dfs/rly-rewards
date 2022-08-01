@@ -96,51 +96,7 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
 
   const allTrackedTokenIds = Object.keys(tokenAccountsByToken);
 
-  const mostRecentBalances: {
-    tracked_token_account_id: number;
-    approximate_minimum_balance: string;
-    datetime: Date;
-    token_id: number;
-  }[] = await knex("tracked_token_account_balances")
-    .join(
-      "tracked_token_accounts",
-      "tracked_token_accounts.id",
-      "tracked_token_account_balances.tracked_token_account_id"
-    )
-    .distinctOn("tracked_token_account_id")
-    .select(
-      "tracked_token_account_id",
-      "approximate_minimum_balance",
-      "datetime",
-      "tracked_token_accounts.token_id"
-    )
-    .where("datetime", "<", lastEndDate)
-    .orderBy([
-      { column: "tracked_token_account_id" },
-      { column: "datetime", order: "desc" },
-    ]);
-
-  // {token_id: {date_string: {account_id: balance}}}
-  const balancesByDateByTokenId: {
-    [key: string]: {
-      [key: string]: { [key: string]: string };
-    };
-  } = {};
-  mostRecentBalances.forEach((balance) => {
-    const dateString = balance.datetime.toISOString();
-
-    if (balancesByDateByTokenId[balance.token_id] === undefined) {
-      balancesByDateByTokenId[balance.token_id] = {};
-    }
-
-    if (balancesByDateByTokenId[balance.token_id]![dateString] === undefined) {
-      balancesByDateByTokenId[balance.token_id]![dateString] = {};
-    }
-
-    balancesByDateByTokenId[balance.token_id]![dateString]![
-      balance.tracked_token_account_id
-    ] = balance.approximate_minimum_balance;
-  });
+  const balancesByDateByTokenId = await getBalancesByDateByTokenId(lastEndDate);
 
   for (let i = 0; i < allTrackedTokenIds.length; i++) {
     const tokenId = allTrackedTokenIds[i]!;
@@ -199,6 +155,63 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
       currentEndDate = new Date(currentEndDate.valueOf() + 24 * 3600 * 1000);
     }
   }
+}
+
+/** This is mostly used as an internal helper but can be useful for sanity checking consistency also
+ *
+ * @param lastEndDate
+ * @returns
+ */
+export async function getBalancesByDateByTokenId(lastEndDate: Date) {
+  const knex = getKnex();
+
+  const mostRecentBalances: {
+    tracked_token_account_id: number;
+    approximate_minimum_balance: string;
+    datetime: Date;
+    token_id: number;
+  }[] = await knex("tracked_token_account_balances")
+    .join(
+      "tracked_token_accounts",
+      "tracked_token_accounts.id",
+      "tracked_token_account_balances.tracked_token_account_id"
+    )
+    .distinctOn("tracked_token_account_id")
+    .select(
+      "tracked_token_account_id",
+      "approximate_minimum_balance",
+      "datetime",
+      "tracked_token_accounts.token_id"
+    )
+    .where("datetime", "<", lastEndDate)
+    .orderBy([
+      { column: "tracked_token_account_id" },
+      { column: "datetime", order: "desc" },
+    ]);
+
+  // {token_id: {date_string: {account_id: balance}}}
+  const balancesByDateByTokenId: {
+    [key: string]: {
+      [key: string]: { [key: string]: string };
+    };
+  } = {};
+  mostRecentBalances.forEach((balance) => {
+    const dateString = balance.datetime.toISOString();
+
+    if (balancesByDateByTokenId[balance.token_id] === undefined) {
+      balancesByDateByTokenId[balance.token_id] = {};
+    }
+
+    if (balancesByDateByTokenId[balance.token_id]![dateString] === undefined) {
+      balancesByDateByTokenId[balance.token_id]![dateString] = {};
+    }
+
+    balancesByDateByTokenId[balance.token_id]![dateString]![
+      balance.tracked_token_account_id
+    ] = balance.approximate_minimum_balance;
+  });
+
+  return balancesByDateByTokenId;
 }
 
 /** Helper function that fetches account info for `end date minus 24 hours` to `endDate` and inserts into DB.
