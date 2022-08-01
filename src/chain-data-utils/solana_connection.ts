@@ -17,9 +17,13 @@ let currentConnection = alchemyConnection;
 
 export async function getTransactionTriaged(signature: string) {
   try {
-    return await currentConnection.getTransaction(signature, {
+    const transaction = await currentConnection.getTransaction(signature, {
       commitment: "confirmed",
     });
+    if (!transaction) {
+      throw new Error(); // sometimes `null` gets returned without an error, treat that as a retry
+    }
+    return transaction;
   } catch (error) {
     console.log(
       `Error with ${
@@ -42,7 +46,14 @@ export async function getTransactionsTriaged(
   signatures: TransactionSignature[]
 ) {
   try {
-    return await currentConnection.getTransactions(signatures, "confirmed");
+    const transactions = await currentConnection.getTransactions(
+      signatures,
+      "confirmed"
+    );
+    if (!transactions) {
+      throw new Error(); // sometimes `null` gets returned without an error, treat that as a retry
+    }
+    return transactions;
   } catch (error) {
     console.log(
       `Error with ${
