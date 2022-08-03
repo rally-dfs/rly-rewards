@@ -28,8 +28,11 @@ export async function totalWallets(
   return parseInt(result[0]?.count);
 }
 
-export async function totalWalletsByDay(trackedTokens: TrackedToken[]) {
-  const startDateFilter = new Date(0);
+export async function totalWalletsByDay(
+  trackedTokens: TrackedToken[],
+  opts?: { startDate?: Date; removeEmptyWallets?: boolean }
+) {
+  const startDateFilter = opts?.startDate || new Date(0);
 
   const dbResponse: { datetime: Date; count: string }[] = await knex
     .from("tracked_token_account_balances")
@@ -37,6 +40,11 @@ export async function totalWalletsByDay(trackedTokens: TrackedToken[]) {
     .countDistinct("tracked_token_account_id")
     .where("datetime", ">=", startDateFilter)
     .whereIn("tracked_token_account_id", accountIdsForTokens(trackedTokens))
+    .modify((query) => {
+      if (opts?.removeEmptyWallets) {
+        query.where("approximate_minimum_balance", ">", 0);
+      }
+    })
     .groupBy("datetime")
     .orderBy("datetime");
 

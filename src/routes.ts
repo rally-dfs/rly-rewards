@@ -115,6 +115,11 @@ routes.get("/vanity_metrics", async (_req, res) => {
     "liquidity_collateral_tokens"
   );
 
+  // totalWallets uses the balances table which is quite large, so put some time bounds
+  // for performance optimization
+  const thirtyDaysAgo = new Date(new Date().valueOf() - 30 * 24 * 3600 * 1000);
+  const ninetyDaysAgo = new Date(new Date().valueOf() - 90 * 24 * 3600 * 1000);
+
   const [
     onchainWalletCount,
     walletByDayData,
@@ -125,8 +130,10 @@ routes.get("/vanity_metrics", async (_req, res) => {
     totalRewardsDistributed,
     rewardsByWeek,
   ] = await Promise.all([
-    totalWallets(allTrackedTokens),
-    totalWalletsByDay(allTrackedTokens),
+    // totalWallets will return the same result no matter which start date assuming no data consistency
+    // issues (since token balances has a row for every day). use 30 days to be extra safe
+    totalWallets(allTrackedTokens, { startDate: thirtyDaysAgo }),
+    totalWalletsByDay(allTrackedTokens, { startDate: ninetyDaysAgo }),
     totalTransactions(allTrackedTokens),
     transactionsByDay(allTrackedTokens),
     totalValueLockedInPools(allLiquidityCollateralTokens),
