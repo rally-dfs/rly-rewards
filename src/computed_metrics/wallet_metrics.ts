@@ -37,7 +37,9 @@ export async function totalWalletsByDay(
   const dbResponse: { datetime: Date; count: string }[] = await knex
     .from("tracked_token_account_balances")
     .select("datetime")
-    .countDistinct("tracked_token_account_id")
+    // count(*) is the same as countDistinct("tracked_token_account_id") as long as we have the
+    // unique(tracked_token_account_id, datetime) index, and it's a much faster query
+    .count("*")
     .where("datetime", ">=", startDateFilter)
     .whereIn("tracked_token_account_id", accountIdsForTokens(trackedTokens))
     .modify((query) => {

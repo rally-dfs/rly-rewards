@@ -23,7 +23,6 @@ describe("GET /vanity_metrics", () => {
     expect(response.body).to.eql({
       totalTokensTracked: 0,
       totalWallets: 0,
-      walletsByDay: [],
       totalTransactions: 0,
       transactionsByDay: [],
       tvl: 0,
@@ -40,7 +39,6 @@ describe("GET /vanity_metrics", () => {
     expect(response.body).to.eql({
       totalTokensTracked: 0,
       totalWallets: 1_244_600,
-      walletsByDay: [],
       totalTransactions: 25_775_850,
       transactionsByDay: [],
       tvl: 65_000_000,

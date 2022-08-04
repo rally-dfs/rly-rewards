@@ -2,10 +2,7 @@ import { Router } from "express";
 import { getKnex } from "./database";
 import { TrackedToken } from "./knex-types/tracked_token";
 import { LiquidityCollateralToken } from "./knex-types/liquidity_collateral_token";
-import {
-  totalWallets,
-  totalWalletsByDay,
-} from "./computed_metrics/wallet_metrics";
+import { totalWallets } from "./computed_metrics/wallet_metrics";
 import {
   totalValueLockedInPools,
   valueLockedByDay,
@@ -117,12 +114,10 @@ routes.get("/vanity_metrics", async (_req, res) => {
 
   // totalWallets uses the balances table which is quite large, so put some time bounds
   // for performance optimization
-  const thirtyDaysAgo = new Date(new Date().valueOf() - 30 * 24 * 3600 * 1000);
-  const ninetyDaysAgo = new Date(new Date().valueOf() - 90 * 24 * 3600 * 1000);
+  const weekAgo = new Date(new Date().valueOf() - 7 * 24 * 3600 * 1000);
 
   const [
     onchainWalletCount,
-    walletByDayData,
     onchainTransactionCount,
     transactionsByDayData,
     onchainTvl,
@@ -131,9 +126,8 @@ routes.get("/vanity_metrics", async (_req, res) => {
     rewardsByWeek,
   ] = await Promise.all([
     // totalWallets will return the same result no matter which start date assuming no data consistency
-    // issues (since token balances has a row for every day). use 30 days to be extra safe
-    totalWallets(allTrackedTokens, { startDate: thirtyDaysAgo }),
-    totalWalletsByDay(allTrackedTokens, { startDate: ninetyDaysAgo }),
+    // issues (since token balances has a row for every day). use 7 days to be extra safe
+    totalWallets(allTrackedTokens, { startDate: weekAgo }),
     totalTransactions(allTrackedTokens),
     transactionsByDay(allTrackedTokens),
     totalValueLockedInPools(allLiquidityCollateralTokens),
@@ -152,7 +146,6 @@ routes.get("/vanity_metrics", async (_req, res) => {
   res.json({
     totalTokensTracked: allTrackedTokens.length,
     totalWallets: totalWalletCount,
-    walletsByDay: walletByDayData,
     totalTransactions: totalTransactionCount,
     transactionsByDay: transactionsByDayData,
     tvl: tvl,
