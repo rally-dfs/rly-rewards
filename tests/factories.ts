@@ -2,6 +2,7 @@ import { getKnex } from "../src/database";
 import { TrackedTokenAccount } from "../src/knex-types/tracked_token_account";
 import { LiquidityCollateralToken } from "../src/knex-types/liquidity_collateral_token";
 import { TrackedToken } from "../src/knex-types/tracked_token";
+import { RewardsDestinationWallet } from "../src/knex-types/rewards_destination_wallet";
 
 const knex = getKnex();
 
@@ -57,6 +58,27 @@ export async function createLiquidityCollateralToken(displayName: string) {
       display_name: displayName,
       decimals: 2,
       mint_address: fakeAddressSeed.toString(),
+    },
+    "*"
+  );
+  if (dbResponse.length < 1) {
+    throw new Error("Unable to create liquidity collateral token");
+  }
+  return dbResponse[0]!;
+}
+
+export async function createRewardsDestinationWallet(
+  destinationAddress: string,
+  name: string,
+  tokenSymbol: string
+) {
+  const dbResponse = await knex<RewardsDestinationWallet>(
+    "rewards_destination_wallets"
+  ).insert(
+    {
+      destination_address: destinationAddress,
+      name: name,
+      token_symbol: tokenSymbol,
     },
     "*"
   );
