@@ -1,7 +1,7 @@
 import { getKnex } from "./database";
-import { PublicKey } from "@solana/web3.js";
-import { getDailyTokenBalancesBetweenDates } from "./chain-data-utils/bq_liquidity_pool";
+import { getDailyTokenBalancesBetweenDates } from "./chain-data-utils/bq_liquidity_pool_base";
 import { LiquidityPoolBalance } from "./knex-types/liquidity_pool_balance";
+import { LiquidityCollateralTokenChain } from "./knex-types/liquidity_collateral_token";
 
 /** Calls getDailyTokenBalancesBetweenDates for all token accounts, starting from the last date whose balance we have */
 export async function getAllDailyTokenBalancesSinceLastFetch(
@@ -73,7 +73,8 @@ export async function getDailyTokenBalances(
       "liquidity_pools.collateral_token_account",
       "liquidity_pools.collateral_token_account_owner",
       "liquidity_collateral_tokens.mint_address",
-      "liquidity_collateral_tokens.decimals"
+      "liquidity_collateral_tokens.decimals",
+      "liquidity_collateral_tokens.chain"
     );
 
   if (liquidityPoolIds !== undefined) {
@@ -82,9 +83,11 @@ export async function getDailyTokenBalances(
 
   const allAccounts: {
     liquidity_pool_id: number;
+    collateral_token_account: string;
     collateral_token_account_owner: string;
     mint_address: string;
     decimals: number;
+    chain: LiquidityCollateralTokenChain;
   }[] = await query;
 
   // TODO: we could optimize this by also seeing what balance data is already in the DB and skipping those dates
@@ -93,15 +96,15 @@ export async function getDailyTokenBalances(
   for (let i = 0; i < allAccounts.length; i++) {
     const account = allAccounts[i]!;
     console.log(
-      `==== Fetching balances for account ${new PublicKey(
-        account.collateral_token_account_owner
-      ).toString()} from ${earliestEndDate} to ${latestEndDate} ====`
+      `==== Fetching balances for account ${account.collateral_token_account} from ${earliestEndDate} to ${latestEndDate} ====`
     );
 
     try {
       const tokenBalanceDates = await getDailyTokenBalancesBetweenDates(
-        new PublicKey(account.collateral_token_account_owner).toString(),
-        new PublicKey(account.mint_address).toString(),
+        account.collateral_token_account,
+        account.collateral_token_account_owner,
+        account.mint_address,
+        account.chain,
         earliestEndDate,
         latestEndDate
       );
@@ -121,9 +124,9 @@ export async function getDailyTokenBalances(
         .merge(); // just update the balance if there's a conflict
 
       console.log(
-        `Inserted balances for ${new PublicKey(
+        `Inserted balances for ${
           account.collateral_token_account_owner
-        ).toString()}, pks ${result.map((res) => res.id)}`
+        }, pks ${result.map((res) => res.id)}`
       );
     } catch (error) {
       console.log("Error fetching account", account, error);

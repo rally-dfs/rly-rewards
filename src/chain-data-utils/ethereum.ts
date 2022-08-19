@@ -22,7 +22,7 @@ export async function getERC20BalanceAtBlock(
   tokenAddress: string,
   address: string,
   blockNumber: number
-) {
+): Promise<string> {
   const contract = new web3.eth.Contract(balanceOfABI, tokenAddress);
   return contract.methods.balanceOf(address).call({}, blockNumber);
 }
