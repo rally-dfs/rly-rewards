@@ -4,4 +4,10 @@ export interface RewardsDestinationWallet {
   destination_address: string;
   name: string;
   token_symbol: string;
+  icon_url?: string;
+  website_url?: string;
+  // this is just display metadata, i.e. NOT the chain of destination_address
+  // (which is always eth for now)
+  display_blockchain?: string;
+  explorer_url?: string;
 }
