@@ -87,3 +87,92 @@ export async function rlyRewardsDistributedByWeek() {
         row.weekStart - dbResponse[index].week_start === 7 * 24 * 3600 * 1000
     );
 }
+
+/** Fetches the total rewards distributed since `startDate`, rounded to nearest whole number and sorted by total
+ *
+ * @param destinationNames if null, returns amount for all destinations
+ * @param startDate if null, returns amounts since start of time
+ */
+export async function rewardsDistributedToDestinationWallets(
+  destinationNames?: string[],
+  startDate?: Date
+) {
+  // find all txn hashes that come from RLY_REWARD_ADDRESS
+  const rewardTransactionHashesSubquery = knex
+    .select("transaction_hash")
+    .from("tracked_token_account_transactions")
+    .join(
+      "tracked_token_accounts",
+      "tracked_token_account_transactions.tracked_token_account_id",
+      "tracked_token_accounts.id"
+    )
+    .where("transfer_in", false)
+    .where("address", RLY_REWARD_ADDRESS)
+    .modify((query) => {
+      if (startDate) {
+        query.where("datetime", ">=", startDate);
+      }
+    });
+
+  // make sure we only calculate totals for the rewards_destination_wallets we care about (just a performance optimization)
+  const destinationAddressesSubquery = knex
+    .select("destination_address")
+    .from("rewards_destination_wallets")
+    .modify((query) => {
+      if (destinationNames) {
+        query.whereIn("rewards_destination_wallets.name", destinationNames);
+      }
+    });
+
+  const amountsByAddressSubquery = knex
+    .select("address")
+    .select(knex.raw("sum(amount / (10 ^ decimals)) as total"))
+    .from("tracked_token_account_transactions")
+    .join(
+      "tracked_token_accounts",
+      "tracked_token_account_transactions.tracked_token_account_id",
+      "tracked_token_accounts.id"
+    )
+    .join(
+      "tracked_tokens",
+      "tracked_token_accounts.token_id",
+      "tracked_tokens.id"
+    )
+    .where("transfer_in", true)
+    .whereIn("transaction_hash", rewardTransactionHashesSubquery)
+    .whereIn("address", destinationAddressesSubquery)
+    .groupBy("address")
+    .as("amounts_by_address");
+
+  const amounts: {
+    name: string;
+    token_symbol: string;
+    destination_address: string;
+    total: number;
+  }[] = await knex
+    .select("rewards_destination_wallets.name")
+    .select("rewards_destination_wallets.token_symbol")
+    .select("rewards_destination_wallets.destination_address")
+    .select("total")
+    .from("rewards_destination_wallets")
+    // use left join so we can return rewards destinations with 0 total
+    .leftJoin(
+      amountsByAddressSubquery,
+      "rewards_destination_wallets.destination_address",
+      "amounts_by_address.address"
+    )
+    .modify((query) => {
+      if (destinationNames) {
+        query.whereIn("rewards_destination_wallets.name", destinationNames);
+      }
+    });
+
+  return amounts
+    .map((row) => ({
+      name: row.name,
+      tokenSymbol: row.token_symbol,
+      address: row.destination_address,
+      total: Math.round(row.total),
+    }))
+    .sort((row1, row2) => row2.total - row1.total);
+}

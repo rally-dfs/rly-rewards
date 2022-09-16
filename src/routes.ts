@@ -12,6 +12,7 @@ import {
   transactionsByDay,
 } from "./computed_metrics/transaction_metrics";
 import {
+  rewardsDistributedToDestinationWallets,
   rlyRewardsDistributedByWeek,
   totalRLYRewardsDistributed,
 } from "./computed_metrics/rewards_distributed";
@@ -152,6 +153,33 @@ routes.get("/vanity_metrics", async (_req, res) => {
     tvlByDay: tvlByDay,
     totalRewards: totalRewardsDistributed,
     rewardsByWeek,
+  });
+});
+
+routes.get("/rewards_distributed", async (_req, res) => {
+  const sevenDaysAgo = new Date(new Date().valueOf() - 7 * 24 * 3600 * 1000);
+  const ninetyDaysAgo = new Date(new Date().valueOf() - 90 * 24 * 3600 * 1000);
+
+  const [weeklyRewards, quarterlyRewards] = await Promise.all([
+    rewardsDistributedToDestinationWallets(undefined, sevenDaysAgo),
+    rewardsDistributedToDestinationWallets(undefined, ninetyDaysAgo),
+  ]);
+
+  // extrapolate yearly rewards based on past week of rewards
+  const yearlyRewardsExtrapolations = weeklyRewards.map((row) => ({
+    name: row.name,
+    tokenSymbol: row.tokenSymbol,
+    total: Math.round((365 / 7) * row.total),
+  }));
+
+  return res.json({
+    weeklyRewards: weeklyRewards.sort((row1, row2) => row2.total - row1.total),
+    quarterlyRewards: quarterlyRewards.sort(
+      (row1, row2) => row2.total - row1.total
+    ),
+    yearlyRewardsExtrapolations: yearlyRewardsExtrapolations.sort(
+      (row1, row2) => row2.total - row1.total
+    ),
   });
 });
 

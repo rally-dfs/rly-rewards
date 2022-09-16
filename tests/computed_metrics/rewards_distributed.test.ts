@@ -1,21 +1,28 @@
 import { expect } from "chai";
 import { getKnex } from "../../src/database";
 import { TrackedToken } from "../../src/knex-types/tracked_token";
-import { createAccount, createTrackedToken } from "../factories";
 import {
+  createAccount,
+  createRewardsDestinationWallet,
+  createTrackedToken,
+} from "../factories";
+import {
+  rewardsDistributedToDestinationWallets,
   rlyRewardsDistributedByWeek,
   totalRLYRewardsDistributed,
 } from "../../src/computed_metrics/rewards_distributed";
 import { TrackedTokenAccount } from "../../src/knex-types/tracked_token_account";
+import { TrackedTokenAccountTransaction } from "../../src/knex-types/tracked_token_account_transaction";
 
 const knex = getKnex();
 
 describe("Rewards distributed", () => {
+  let trackedToken: TrackedToken;
   let rlyRewardsAccount: TrackedTokenAccount;
   let otherAccount: TrackedTokenAccount;
 
   beforeEach(async () => {
-    const trackedToken = await createTrackedToken("RLY", "fake_address_1", 18);
+    trackedToken = await createTrackedToken("RLY", "fake_address_1", 18);
 
     rlyRewardsAccount = await createAccount(
       trackedToken,
@@ -180,6 +187,202 @@ describe("Rewards distributed", () => {
       expect(await rlyRewardsDistributedByWeek()).to.eql([
         { weekStart: new Date("2022-06-06T00:00:00Z"), amount: 0 },
         { weekStart: new Date("2022-06-27T00:00:00Z"), amount: 4 },
+      ]);
+    });
+  });
+
+  describe("#rewardsDistributedToDestinationWallets", () => {
+    beforeEach(async () => {
+      const receiverAccounts = await Promise.all(
+        [...Array(5).keys()].map((i) =>
+          createAccount(trackedToken, new Date("2022-06-01"), `fakeAddress${i}`)
+        )
+      );
+
+      await Promise.all(
+        [...Array(5).keys()].map((i) =>
+          createRewardsDestinationWallet(
+            `fakeAddress${i}`,
+            `Name ${i}`,
+            `SYMBOL${i}`
+          )
+        )
+      );
+
+      // seed txns from rlyRewardsAccount, every other day starting on 6/10
+      const txns: TrackedTokenAccountTransaction[][][] = receiverAccounts.map(
+        (receiverAccount, receiverIndex) =>
+          [...Array(10).keys()].map((txnIndex) => [
+            // one outbound txn and one inbound txn
+            {
+              tracked_token_account_id: rlyRewardsAccount.id!,
+              transfer_in: false,
+              // the below should all match the inbound txn (and be unique)
+              datetime: new Date(`2022-06-${txnIndex * 2 + 10}T00:00:00Z`),
+              transaction_hash: `2022-06-${
+                txnIndex * 2 + 1
+              }T00:00:00Z${receiverIndex}`,
+              amount: 100 * receiverIndex + txnIndex + "0".repeat(17),
+            },
+            {
+              tracked_token_account_id: receiverAccount.id!,
+              transfer_in: true,
+              datetime: new Date(`2022-06-${txnIndex * 2 + 10}T00:00:00Z`),
+              transaction_hash: `2022-06-${
+                txnIndex * 2 + 1
+              }T00:00:00Z${receiverIndex}`,
+              amount: 100 * receiverIndex + txnIndex + "0".repeat(17),
+            },
+            // seed some txns from otherAccount to receiverAccounts to make sure those aren't counted
+            {
+              tracked_token_account_id: otherAccount.id!,
+              transfer_in: false,
+              // the below should all match the inbound txn (and be unique)
+              datetime: new Date(`2022-06-${txnIndex * 2 + 10}T00:00:00Z`),
+              transaction_hash: `2022-06-${
+                txnIndex * 2 + 1
+              }T00:00:00Z${receiverIndex}fromOther`,
+              amount: 200 * receiverIndex + txnIndex + "0".repeat(17),
+            },
+            {
+              tracked_token_account_id: receiverAccount.id!,
+              transfer_in: true,
+              datetime: new Date(`2022-06-${txnIndex * 2 + 10}T00:00:00Z`),
+              transaction_hash: `2022-06-${
+                txnIndex * 2 + 1
+              }T00:00:00Z${receiverIndex}fromOther`,
+              amount: 200 * receiverIndex + txnIndex + "0".repeat(17),
+            },
+            // seed some txns from rlyReward to otherAccount too to make sure those aren't counted
+            {
+              tracked_token_account_id: rlyRewardsAccount.id!,
+              transfer_in: false,
+              // the below should all match the inbound txn (and be unique)
+              datetime: new Date(`2022-06-${txnIndex * 2 + 10}T00:00:00Z`),
+              transaction_hash: `2022-06-${
+                txnIndex * 2 + 1
+              }T00:00:00Z${receiverIndex}toOther`,
+              amount: 300 * receiverIndex + txnIndex + "0".repeat(17),
+            },
+            {
+              tracked_token_account_id: otherAccount.id!,
+              transfer_in: true,
+              datetime: new Date(`2022-06-${txnIndex * 2 + 10}T00:00:00Z`),
+              transaction_hash: `2022-06-${
+                txnIndex * 2 + 1
+              }T00:00:00Z${receiverIndex}toOther`,
+              amount: 300 * receiverIndex + txnIndex + "0".repeat(17),
+            },
+          ])
+      );
+
+      await knex("tracked_token_account_transactions").insert(txns.flat(2));
+    });
+
+    it("returns all data", async () => {
+      // 10 txns each across 5 receivers:
+      // Name 0: 0.0 + 0.1 + ... + 0.9 = 4.5 (rounded to 5)
+      // Name 1: 10.0 + 10.1 + ... + 10.9 = 104.5 (rounded to 105)
+      // etc (in sorted order)
+      expect(await rewardsDistributedToDestinationWallets()).to.eql([
+        {
+          name: "Name 4",
+          tokenSymbol: "SYMBOL4",
+          address: "fakeAddress4",
+          total: 405,
+        },
+        {
+          name: "Name 3",
+          tokenSymbol: "SYMBOL3",
+          address: "fakeAddress3",
+          total: 305,
+        },
+        {
+          name: "Name 2",
+          tokenSymbol: "SYMBOL2",
+          address: "fakeAddress2",
+          total: 205,
+        },
+        {
+          name: "Name 1",
+          tokenSymbol: "SYMBOL1",
+          address: "fakeAddress1",
+          total: 105,
+        },
+        {
+          name: "Name 0",
+          tokenSymbol: "SYMBOL0",
+          address: "fakeAddress0",
+          total: 5,
+        },
+      ]);
+    });
+
+    it("returns startDate limited data", async () => {
+      // should return everything after and including 6/22, i.e.
+      // Name 0: 0.6 + 0.7 + 0.8 + 0.9 = 3
+      // Name 1: 10.6 + 10.7 + 10.8 + 10.9 = 43
+      // etc
+      expect(
+        await rewardsDistributedToDestinationWallets(
+          undefined,
+          new Date("2022-06-22T00:00:00Z")
+        )
+      ).to.eql([
+        {
+          name: "Name 4",
+          tokenSymbol: "SYMBOL4",
+          address: "fakeAddress4",
+          total: 163,
+        },
+        {
+          name: "Name 3",
+          tokenSymbol: "SYMBOL3",
+          address: "fakeAddress3",
+          total: 123,
+        },
+        {
+          name: "Name 2",
+          tokenSymbol: "SYMBOL2",
+          address: "fakeAddress2",
+          total: 83,
+        },
+        {
+          name: "Name 1",
+          tokenSymbol: "SYMBOL1",
+          address: "fakeAddress1",
+          total: 43,
+        },
+        {
+          name: "Name 0",
+          tokenSymbol: "SYMBOL0",
+          address: "fakeAddress0",
+          total: 3,
+        },
+      ]);
+    });
+
+    it("returns filtered destination data", async () => {
+      // should only return Name 1 and Name 2 (name must be exact match)
+      expect(
+        await rewardsDistributedToDestinationWallets([
+          "Name 1",
+          "Name 2",
+          "name 3",
+        ])
+      ).to.eql([
+        {
+          name: "Name 2",
+          tokenSymbol: "SYMBOL2",
+          address: "fakeAddress2",
+          total: 205,
+        },
+        {
+          name: "Name 1",
+          tokenSymbol: "SYMBOL1",
+          address: "fakeAddress1",
+          total: 105,
+        },
       ]);
     });
   });
