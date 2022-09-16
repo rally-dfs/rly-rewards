@@ -10,24 +10,21 @@ function _tokenAccountBalanceOnDate(
   tokenMintAddress: string,
   chain: LiquidityCollateralTokenChain,
   currentEndDateExclusive: Date,
-  previousBalance: string,
-  previousEndDateExclusive: Date
+  previousBalance?: string
 ) {
   if (chain === "solana") {
     return solanaTokenAccountBalanceOnDate(
       tokenAccountOwnerAddress, // bq requires owner address for solana, not the actual address
       tokenMintAddress,
       currentEndDateExclusive,
-      previousBalance,
-      previousEndDateExclusive
+      previousBalance
     );
   } else if (chain === "ethereum") {
     return ethTokenAccountBalanceOnDate(
       tokenAccountAddress, // bq requires actual address for eth (obviously)
       tokenMintAddress,
       currentEndDateExclusive,
-      previousBalance,
-      previousEndDateExclusive
+      previousBalance
     );
   } else {
     throw new Error(`Invalid chain ${chain}`);
@@ -54,10 +51,7 @@ export async function getDailyTokenBalancesBetweenDates(
 ) {
   let allBalances: Array<TokenBalanceDate> = [];
 
-  // 0 + a date assumes the all activity happened after that date
-  let previousBalance = "0";
-  // Dec 2021 was when sRLY was minted, probably an okay default
-  let previousEndDateExclusive = new Date("2021-12-19T00:00:00Z");
+  let previousBalance = undefined;
 
   let currentEndDateExclusive = new Date(earliestEndDateExclusive);
 
@@ -66,19 +60,17 @@ export async function getDailyTokenBalancesBetweenDates(
       "fetching date",
       currentEndDateExclusive,
       "prev date bal",
-      previousEndDateExclusive,
       previousBalance
     );
 
     try {
-      let balance = await _tokenAccountBalanceOnDate(
+      const balance: string | undefined = await _tokenAccountBalanceOnDate(
         tokenAccountAddress,
         tokenAccountOwnerAddress,
         tokenMintAddress,
         chain,
         currentEndDateExclusive,
-        previousBalance,
-        previousEndDateExclusive
+        previousBalance
       );
 
       if (balance === undefined || balance === null) {
@@ -90,14 +82,12 @@ export async function getDailyTokenBalancesBetweenDates(
         balance: balance,
       });
 
-      previousEndDateExclusive = new Date(currentEndDateExclusive);
       previousBalance = balance;
     } catch (error) {
       console.error(
         "Error fetching balance",
         tokenAccountOwnerAddress,
         currentEndDateExclusive,
-        previousEndDateExclusive,
         error
       );
 

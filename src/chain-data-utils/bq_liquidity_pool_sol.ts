@@ -6,10 +6,9 @@ import { getSolanaTransaction } from "./solana";
  * Since bitquery results don't contain the date information and aren't guaranteed to be sorted, this is best used in
  * conjunction with tokenAccountBalanceOnDateSolanaFm to just make sure there isn't anything missing in solana.fm
  */
-async function _lastSolanaTransactionBetweenDatesBitquery(
+async function _lastSolanaTransactionBeforeDateBitquery(
   tokenAccountOwnerAddress: string,
   tokenMintAddress: string,
-  startDateInclusive: Date,
   endDateExclusive: Date
 ) {
   // bitquery treats endDate as inclusive, so we need to subtract 1 millisecond from endDateExclusive
@@ -19,20 +18,19 @@ async function _lastSolanaTransactionBetweenDatesBitquery(
   const endDateInclusive = new Date(endDateExclusive.valueOf() - 1);
 
   const variables = {
-    startTime: startDateInclusive.toISOString(),
     endTime: endDateInclusive.toISOString(),
     tokenMintAddress: tokenMintAddress,
     tokenAccountOwnerAddress: tokenAccountOwnerAddress,
   };
 
   const senderTransactionQuery = `query TransfersForSenderAndToken(
-          $startTime: ISO8601DateTime!, $endTime: ISO8601DateTime!,
+          $endTime: ISO8601DateTime!,
           $tokenMintAddress: String!,
           $tokenAccountOwnerAddress: String!) {
         solana {
           transfers(
             options: {limit: 1, desc: "block.timestamp.iso8601"}
-            time: {between: [$startTime, $endTime]}
+            time: {before: $endTime}
             currency: {is: $tokenMintAddress}
             success: {is: true}
             senderAddress: {is: $tokenAccountOwnerAddress}
@@ -60,13 +58,13 @@ async function _lastSolanaTransactionBetweenDatesBitquery(
 
   // same as transfersOut but filter by `receiverAddress` instead of `senderAddress`
   const receiverTransactionQuery = `query TransfersForReceiverAndToken(
-        $startTime: ISO8601DateTime!, $endTime: ISO8601DateTime!,
+        $endTime: ISO8601DateTime!,
         $tokenMintAddress: String!,
         $tokenAccountOwnerAddress: String!) {
       solana {
         transfers(
           options: {limit: 1, desc: "block.timestamp.iso8601"}
-          time: {between: [$startTime, $endTime]}
+          time: {before: $endTime}
           currency: {is: $tokenMintAddress}
           success: {is: true}
           receiverAddress: {is: $tokenAccountOwnerAddress}
@@ -109,14 +107,12 @@ export async function solanaTokenAccountBalanceOnDate(
   tokenAccountOwnerAddress: string,
   tokenMintAddress: string,
   endDateExclusive: Date,
-  previousBalance: string,
-  previousEndDateExclusive: Date
+  previousBalance?: string
 ) {
   // load all transfers in
-  const latestTxnHash = await _lastSolanaTransactionBetweenDatesBitquery(
+  const latestTxnHash = await _lastSolanaTransactionBeforeDateBitquery(
     tokenAccountOwnerAddress,
     tokenMintAddress,
-    previousEndDateExclusive,
     endDateExclusive
   );
 

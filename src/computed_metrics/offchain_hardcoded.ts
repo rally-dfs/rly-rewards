@@ -4,7 +4,7 @@ const WALLET_COUNTS = {
   Rallyio: 130_000,
   Unite: 7_500,
   Shop: 2_100,
-  JoyrideSolitaire: 530_000,
+  JoyrideSolitaire: 1_000_000,
 };
 
 const TXN_COUNTS = {
@@ -12,12 +12,12 @@ const TXN_COUNTS = {
   Rallyio: 6_250_000,
   Unite: 10_750,
   Shop: 15_100,
-  JoyrideSolitaire: 6_000_000,
+  JoyrideSolitaire: 11_000_000,
 };
 
 // these numbers should be post-decimals (not on chain units)
 const TVL_AMOUNTS = {
-  JoyrideSolitaire: 27_000_000,
+  JoyrideSolitaire: 65_000_000,
 };
 
 export type OffchainHardcodedData = {

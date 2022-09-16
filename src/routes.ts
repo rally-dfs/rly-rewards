@@ -2,10 +2,7 @@ import { Router } from "express";
 import { getKnex } from "./database";
 import { TrackedToken } from "./knex-types/tracked_token";
 import { LiquidityCollateralToken } from "./knex-types/liquidity_collateral_token";
-import {
-  totalWallets,
-  totalWalletsByDay,
-} from "./computed_metrics/wallet_metrics";
+import { totalWallets } from "./computed_metrics/wallet_metrics";
 import {
   totalValueLockedInPools,
   valueLockedByDay,
@@ -19,6 +16,7 @@ import {
   totalRLYRewardsDistributed,
 } from "./computed_metrics/rewards_distributed";
 import { getOffchainHardcodedData } from "./computed_metrics/offchain_hardcoded";
+import { getBalancesByDateByTokenId } from "./tracked_token_accounts";
 
 const routes = Router();
 
@@ -30,15 +28,96 @@ routes.get("/", async (_req, res) => {
   });
 });
 
+routes.get("/consistency_status", async (_req, res) => {
+  // for latestLiquidityPoolBalances {mostRecentDate: [account]}
+  const poolsQuery = knex
+    .select("collateral_token_account")
+    .max("datetime as max_datetime")
+    .from("liquidity_pool_balances")
+    .join(
+      "liquidity_pools",
+      "liquidity_pools.id",
+      "liquidity_pool_balances.liquidity_pool_id"
+    )
+    .groupBy("collateral_token_account");
+
+  const balancesByDateByTokenIdQuery = getBalancesByDateByTokenId(new Date());
+
+  const tokensWithAccountsAndTxnsQuery = knex
+    .select("token_id", "mint_address", "display_name")
+    .max("datetime as max_datetime")
+    .countDistinct("tracked_token_accounts.id as account_count")
+    .from("tracked_token_accounts")
+    .leftJoin(
+      // make sure to left join so account_count includes accounts with 0 txns still
+      "tracked_token_account_transactions",
+      "tracked_token_accounts.id",
+      "tracked_token_account_transactions.tracked_token_account_id"
+    )
+    .join(
+      "tracked_tokens",
+      "tracked_tokens.id",
+      "tracked_token_accounts.token_id"
+    )
+    .groupBy("token_id", "mint_address", "display_name");
+
+  const [pools, balancesByDateByTokenId, tokensWithAccountsAndTxns] =
+    await Promise.all([
+      poolsQuery,
+      balancesByDateByTokenIdQuery,
+      tokensWithAccountsAndTxnsQuery,
+    ]);
+
+  return res.json({
+    // {mostRecentDate: [accounts]}
+    // useful for checking if a specific liquidity pool is behind
+    latestLiquidityPoolBalances: pools.reduce((poolsByDate, pool) => {
+      const dateString = pool.max_datetime.toISOString();
+      poolsByDate[dateString] = poolsByDate[dateString] || [];
+      poolsByDate[dateString].push(pool.collateral_token_account);
+      return poolsByDate;
+    }, {}),
+
+    // [{id, mint_address, display_name, max_datetime, account_count}]
+    // just general token account info
+    tokensWithAccountsAndTxns,
+
+    // {tokenId: [recentDates]}
+    // useful for checking there there's only 1 most recent balance date per token
+    // (if there's > 1, that means there's some inconsistency in TrackedTokenAccountBalance table)
+    uniqueLatestTokenBalanceDates: Object.fromEntries(
+      Object.entries(balancesByDateByTokenId).map(
+        ([tokenId, balancesByDate]) => [tokenId, Object.keys(balancesByDate)]
+      )
+    ),
+
+    // {mostRecentDate: [mintAddresses]}
+    // useful for seeing if a specific tracked token is behind (could also use TrackedTokenAccountBalance data
+    // for this but transactions should be more accurate)
+    latestTokenTransactions: tokensWithAccountsAndTxns.reduce(
+      (tokensByDate, token) => {
+        const dateString = token.max_datetime.toISOString();
+        tokensByDate[dateString] = tokensByDate[dateString] || [];
+        tokensByDate[dateString].push(token.mint_address);
+        return tokensByDate;
+      },
+      {}
+    ),
+  });
+});
+
 routes.get("/vanity_metrics", async (_req, res) => {
   const allTrackedTokens = await knex<TrackedToken>("tracked_tokens");
   const allLiquidityCollateralTokens = await knex<LiquidityCollateralToken>(
     "liquidity_collateral_tokens"
   );
 
+  // totalWallets uses the balances table which is quite large, so put some time bounds
+  // for performance optimization
+  const weekAgo = new Date(new Date().valueOf() - 7 * 24 * 3600 * 1000);
+
   const [
     onchainWalletCount,
-    walletByDayData,
     onchainTransactionCount,
     transactionsByDayData,
     onchainTvl,
@@ -46,8 +125,9 @@ routes.get("/vanity_metrics", async (_req, res) => {
     totalRewardsDistributed,
     rewardsByWeek,
   ] = await Promise.all([
-    totalWallets(allTrackedTokens),
-    totalWalletsByDay(allTrackedTokens),
+    // totalWallets will return the same result no matter which start date assuming no data consistency
+    // issues (since token balances has a row for every day). use 7 days to be extra safe
+    totalWallets(allTrackedTokens, { startDate: weekAgo }),
     totalTransactions(allTrackedTokens),
     transactionsByDay(allTrackedTokens),
     totalValueLockedInPools(allLiquidityCollateralTokens),
@@ -66,7 +146,6 @@ routes.get("/vanity_metrics", async (_req, res) => {
   res.json({
     totalTokensTracked: allTrackedTokens.length,
     totalWallets: totalWalletCount,
-    walletsByDay: walletByDayData,
     totalTransactions: totalTransactionCount,
     transactionsByDay: transactionsByDayData,
     tvl: tvl,
