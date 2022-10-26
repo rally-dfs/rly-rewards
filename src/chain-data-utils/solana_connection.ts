@@ -9,7 +9,7 @@ const alchemyConnection = new Connection(
 );
 
 const genesysConnection = new Connection(
-  "https://ssc-dao.genesysgo.net/",
+  `https://cold-twilight-fog.solana-mainnet.discover.quiknode.pro/${process.env.QUICKNODE_SOLANA_ID}/`,
   "finalized"
 );
 
