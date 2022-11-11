@@ -50,10 +50,18 @@ export async function totalValueLockedInPools(
 export async function valueLockedByDay(
   collateralTokens: LiquidityCollateralToken[]
 ) {
-  const dbResponse: { datetime: Date; sum: string }[] = await knex
+  const dbResponse: {
+    datetime: Date;
+    sum: string;
+    count: string;
+    complete: boolean;
+  }[] = await knex
     .select("datetime")
     .sum(knex.raw("balance / (10 ^ decimals)"))
     .as("balance")
+    // heuristic to determine whether a day has partial data (would be more reliable to compare the actual
+    // pool IDs but we rarely add pools anyway so count should be good enough)
+    .count("balance")
     .from("liquidity_pool_balances")
     .innerJoin(
       "liquidity_pools",
@@ -69,10 +77,25 @@ export async function valueLockedByDay(
     .groupBy("datetime")
     .orderBy("datetime");
 
-  return dbResponse.map((record) => {
-    return {
-      date: record.datetime.toISOString(),
-      balance: parseInt(record.sum),
-    };
-  });
+  // drop any days that have partial data (i.e. they have `count` less than the previous days)
+  // partial data appears as a decrease in TVL when it's really just a scraping error, so just don't show that day
+  let maxCountSoFar = 0;
+  for (let i = 0; i < dbResponse.length; i++) {
+    const currentCount = parseInt(dbResponse[i]!.count);
+    if (currentCount >= maxCountSoFar) {
+      dbResponse[i]!.complete = true;
+      maxCountSoFar = currentCount;
+    } else {
+      dbResponse[i]!.complete = false;
+    }
+  }
+
+  return dbResponse
+    .filter((record) => record.complete)
+    .map((record) => {
+      return {
+        date: record.datetime.toISOString(),
+        balance: parseInt(record.sum),
+      };
+    });
 }
