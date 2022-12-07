@@ -28,7 +28,7 @@ export async function getTransactionTriaged(signature: string) {
     console.log(
       `Error with ${
         currentConnection.rpcEndpoint.split("/")[2]
-      }, trying other connection`
+      }, trying other connection. Error: ${error}`
     );
 
     currentConnection =
@@ -58,7 +58,7 @@ export async function getTransactionsTriaged(
     console.log(
       `Error with ${
         currentConnection.rpcEndpoint.split("/")[2]
-      }, trying other connection`
+      }, trying other connection. Error: ${error}`
     );
 
     currentConnection =

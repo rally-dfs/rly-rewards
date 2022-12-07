@@ -22,7 +22,7 @@ export async function getMultipleSolanaTransactionBalances(
   const results: { [key: string]: { [key: string]: number } } = {};
   const retries: { [key: string]: string[] } = {};
 
-  const chunkSize = 20;
+  const chunkSize = 10;
 
   const txnHashes = Object.keys(txnInfos);
 
