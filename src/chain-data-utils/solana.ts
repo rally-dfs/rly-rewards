@@ -43,16 +43,27 @@ export async function getMultipleSolanaTransactionBalances(
       const ownerAddresses = txnInfos[hash]!;
       ownerAddresses.forEach((tokenAccountOwnerAddress) => {
         const balances = txnInfo?.meta?.postTokenBalances?.filter(
-          (tokenInfo) =>
-            (tokenInfo.owner === tokenAccountOwnerAddress &&
-              tokenInfo.mint === tokenMintAddress) ||
+          (tokenInfo) => {
             // sometimes bitquery incorrectly returns the token address as the owner instead (think this happens if the
             // account is closed and rent removed, which messes with their scraping), so we can fall back on
             // using it as the account address instead and look it up in accountKeys
-            tokenInfo.accountIndex ==
-              txnInfo.transaction.message.accountKeys
-                .map((accountKey) => accountKey.toString())
-                .indexOf(tokenAccountOwnerAddress)
+            let isAccountIndexMatchFallback = false;
+            if (txnInfo.version == "legacy") {
+              // note this fallback logic doens't work for v0 txns, there's probably a way to make something similar
+              // work there too if we really want to, accountKeys works differently from the legacy ones
+              isAccountIndexMatchFallback =
+                tokenInfo.accountIndex ==
+                txnInfo.transaction.message.staticAccountKeys
+                  .map((accountKey) => accountKey.toString())
+                  .indexOf(tokenAccountOwnerAddress);
+            }
+
+            return (
+              (tokenInfo.owner === tokenAccountOwnerAddress &&
+                tokenInfo.mint === tokenMintAddress) ||
+              isAccountIndexMatchFallback
+            );
+          }
         );
 
         if (!balances || balances.length === 0) {

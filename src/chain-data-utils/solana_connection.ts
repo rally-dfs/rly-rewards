@@ -19,6 +19,7 @@ export async function getTransactionTriaged(signature: string) {
   try {
     const transaction = await currentConnection.getTransaction(signature, {
       commitment: "confirmed",
+      maxSupportedTransactionVersion: 0,
     });
     if (!transaction) {
       throw new Error(); // sometimes `null` gets returned without an error, treat that as a retry
@@ -38,6 +39,7 @@ export async function getTransactionTriaged(signature: string) {
 
     return await currentConnection.getTransaction(signature, {
       commitment: "confirmed",
+      maxSupportedTransactionVersion: 0,
     });
   }
 }
@@ -46,10 +48,10 @@ export async function getTransactionsTriaged(
   signatures: TransactionSignature[]
 ) {
   try {
-    const transactions = await currentConnection.getTransactions(
-      signatures,
-      "confirmed"
-    );
+    const transactions = await currentConnection.getTransactions(signatures, {
+      commitment: "confirmed",
+      maxSupportedTransactionVersion: 0,
+    });
     if (!transactions) {
       throw new Error(); // sometimes `null` gets returned without an error, treat that as a retry
     }
@@ -66,6 +68,9 @@ export async function getTransactionsTriaged(
         ? genesysConnection
         : alchemyConnection;
 
-    return await currentConnection.getTransactions(signatures, "confirmed");
+    return await currentConnection.getTransactions(signatures, {
+      commitment: "confirmed",
+      maxSupportedTransactionVersion: 0,
+    });
   }
 }
