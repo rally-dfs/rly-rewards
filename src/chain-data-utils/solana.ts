@@ -1,6 +1,7 @@
 import {
   getTransactionsTriaged,
   getTransactionTriaged,
+  switchConnection,
 } from "./solana_connection";
 
 export async function getSolanaTransaction(hash: string) {
@@ -97,6 +98,9 @@ export async function getMultipleSolanaTransactionBalances(
         retries
       )}`
     );
+
+    // go ahead and switch solana connections before retrying in case one's returning bad data with one of them
+    switchConnection();
 
     const retryResults = await getMultipleSolanaTransactionBalances(
       retries,

@@ -15,6 +15,13 @@ const genesysConnection = new Connection(
 
 let currentConnection = alchemyConnection;
 
+export function switchConnection() {
+  currentConnection =
+    currentConnection === alchemyConnection
+      ? genesysConnection
+      : alchemyConnection;
+}
+
 export async function getTransactionTriaged(signature: string) {
   try {
     const transaction = await currentConnection.getTransaction(signature, {
@@ -32,10 +39,7 @@ export async function getTransactionTriaged(signature: string) {
       }, trying other connection. Error: ${error}`
     );
 
-    currentConnection =
-      currentConnection === alchemyConnection
-        ? genesysConnection
-        : alchemyConnection;
+    switchConnection();
 
     return await currentConnection.getTransaction(signature, {
       commitment: "confirmed",
@@ -63,10 +67,7 @@ export async function getTransactionsTriaged(
       }, trying other connection. Error: ${error}`
     );
 
-    currentConnection =
-      currentConnection === alchemyConnection
-        ? genesysConnection
-        : alchemyConnection;
+    switchConnection();
 
     return await currentConnection.getTransactions(signatures, {
       commitment: "confirmed",
