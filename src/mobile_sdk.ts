@@ -34,6 +34,8 @@ export async function getMobileSDKTransactions(
   toBlock: number,
   fromBlock?: number
 ) {
+  const knex = getKnex();
+
   // TODO: replace with final contracts/ABIs
   const contractsAndABIs = {
     // TODO: maybe dont really need to fetch paymaster events here, can just see whether topics[0]
@@ -43,10 +45,21 @@ export async function getMobileSDKTransactions(
     "0xD934Ac8fB32336C5a2b51dF6a97432C4De0594F3": TokenFaucetABI as AbiItem[],
   };
 
+  if (fromBlock === undefined) {
+    const dbResponse = await knex<MobileSDKKeyTransaction>(
+      "mobile_sdk_key_transactions"
+    )
+      .select("block_number")
+      .orderBy("block_number", "desc")
+      .limit(1);
+
+    fromBlock = dbResponse[0] ? dbResponse[0].block_number : 0;
+  }
+
   const { events, transactions, receipts, blocks } =
     await getEventsTransactionReceiptsAndBlocksFromContracts(
       contractsAndABIs,
-      fromBlock ? fromBlock : 0, // TODO: testing, should be from last block
+      fromBlock,
       toBlock
     );
 
@@ -148,7 +161,7 @@ async function _createNamedKeyTransactions(
 
 async function _createAllOtherKeyTransactions(
   namedKeyTransactionsCreated: MobileSDKKeyTransaction[],
-  fromBlock: number | undefined,
+  fromBlock: number,
   toBlock: number
 ) {
   const knex = getKnex();
@@ -183,7 +196,7 @@ async function _createAllOtherKeyTransactions(
       // 150 alchemy CU
       const fromAssetTransfers: AssetTransfersWithMetadataResponse =
         await alchemy.core.getAssetTransfers({
-          fromBlock: fromBlock ? `0x${fromBlock.toString(16)}` : "0x0",
+          fromBlock: `0x${fromBlock.toString(16)}`,
           toBlock: `0x${toBlock.toString(16)}`,
           fromAddress: walletAddress,
           withMetadata: true,
@@ -220,7 +233,7 @@ async function _createAllOtherKeyTransactions(
     for (let currentPage = 0; currentPage < 10000; currentPage++) {
       const toAssetTransfers: AssetTransfersWithMetadataResponse =
         await alchemy.core.getAssetTransfers({
-          fromBlock: fromBlock ? `0x${fromBlock.toString(16)}` : "0x0",
+          fromBlock: `0x${fromBlock.toString(16)}`,
           toBlock: `0x${toBlock.toString(16)}`,
           toAddress: walletAddress,
           withMetadata: true,
