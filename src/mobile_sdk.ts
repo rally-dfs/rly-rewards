@@ -13,22 +13,15 @@ import {
   getEventsTransactionReceiptsAndBlocksFromContracts,
   getTransactionReceiptsBatched,
 } from "./chain-data-utils/polygon";
+import { getAllAssetTransfersByAddress } from "./chain-data-utils/alchemy";
 
-import {
-  Alchemy,
-  Network,
-  AssetTransfersCategory,
-  AssetTransfersWithMetadataResult,
-  AssetTransfersWithMetadataResponse,
-} from "alchemy-sdk";
+import { AssetTransfersWithMetadataResult } from "alchemy-sdk";
 import { MobileSDKKeyTransactionType } from "./knex-types/mobile_sdk_key_transaction";
 import { BlockTransactionString } from "web3-eth";
 
 // from testing, there's a ~10K row insert limit, split the inserts into chunks in case there's too many (probably
 // would mostly only happen with transactions)
 const INSERT_CHUNK_SIZE = 10000;
-
-const TIMEOUT_BETWEEN_CALLS = 1000;
 
 export async function getMobileSDKTransactions(
   toBlock: number,
@@ -173,99 +166,17 @@ async function _createAllOtherKeyTransactions(
     "address"
   );
 
-  // TODO: should move this whole alchemy AllTranactions fetching logic into a separate file
-  const config = {
-    apiKey: process.env.ALCHEMY_ETH_ID,
-    network: Network.MATIC_MUMBAI,
-  };
-  const alchemy = new Alchemy(config);
+  const allAssetTransfersByAddress = await getAllAssetTransfersByAddress(
+    allWallets.map((row) => row.address),
+    fromBlock,
+    toBlock
+  );
 
   const allAssetTransfersByWalletId: {
     [key: number]: AssetTransfersWithMetadataResult[];
-  } = {};
-
-  for (let i = 0; i < allWallets.length; i++) {
-    const walletId = allWallets[i]!.id!;
-    const walletAddress = allWallets[i]!.address;
-
-    let allWalletAssetTransfers: AssetTransfersWithMetadataResult[] = [];
-
-    let pageKey = undefined;
-    // infinite loop protection instead of while(true)
-    for (let currentPage = 0; currentPage < 10000; currentPage++) {
-      // 150 alchemy CU
-      const fromAssetTransfers: AssetTransfersWithMetadataResponse =
-        await alchemy.core.getAssetTransfers({
-          fromBlock: `0x${fromBlock.toString(16)}`,
-          toBlock: `0x${toBlock.toString(16)}`,
-          fromAddress: walletAddress,
-          withMetadata: true,
-          pageKey: pageKey,
-          category: [
-            AssetTransfersCategory.EXTERNAL,
-            AssetTransfersCategory.ERC1155,
-            AssetTransfersCategory.ERC20,
-            AssetTransfersCategory.ERC721,
-            AssetTransfersCategory.SPECIALNFT,
-          ],
-        });
-      console.log(
-        `alchemy fromAssetTransfers ${JSON.stringify(
-          fromAssetTransfers
-        )} pagekey ${pageKey}`
-      );
-      allWalletAssetTransfers = allWalletAssetTransfers.concat(
-        fromAssetTransfers.transfers
-      );
-
-      if (fromAssetTransfers.pageKey === undefined) {
-        break;
-      } else {
-        pageKey = fromAssetTransfers.pageKey;
-        await new Promise((f) => setTimeout(f, TIMEOUT_BETWEEN_CALLS));
-      }
-    }
-
-    // same code as above, just with `toAddress` instead of `fromAddress` (need to have separate
-    //loops for separate pagination)
-    pageKey = undefined;
-    // infinite loop protection instead of while(true)
-    for (let currentPage = 0; currentPage < 10000; currentPage++) {
-      const toAssetTransfers: AssetTransfersWithMetadataResponse =
-        await alchemy.core.getAssetTransfers({
-          fromBlock: `0x${fromBlock.toString(16)}`,
-          toBlock: `0x${toBlock.toString(16)}`,
-          toAddress: walletAddress,
-          withMetadata: true,
-          pageKey: pageKey,
-          category: [
-            AssetTransfersCategory.EXTERNAL,
-            AssetTransfersCategory.ERC1155,
-            AssetTransfersCategory.ERC20,
-            AssetTransfersCategory.ERC721,
-            AssetTransfersCategory.SPECIALNFT,
-          ],
-        });
-      console.log(
-        `alchemy toAssetTransfers ${JSON.stringify(
-          toAssetTransfers
-        )} pagekey ${pageKey}`
-      );
-
-      allWalletAssetTransfers = allWalletAssetTransfers.concat(
-        toAssetTransfers.transfers
-      );
-
-      if (toAssetTransfers.pageKey === undefined) {
-        break;
-      } else {
-        pageKey = toAssetTransfers.pageKey;
-        await new Promise((f) => setTimeout(f, TIMEOUT_BETWEEN_CALLS));
-      }
-    }
-
-    allAssetTransfersByWalletId[walletId] = allWalletAssetTransfers;
-  }
+  } = Object.fromEntries(
+    allWallets.map((row) => [row.id, allAssetTransfersByAddress[row.address]])
+  );
 
   // get txn receipts for the "other" asset transfers
   const allAssetTransferReceipts = await getTransactionReceiptsBatched([
