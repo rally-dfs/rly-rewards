@@ -79,6 +79,10 @@ export async function createRewardsDestinationWallet(
       destination_address: destinationAddress,
       name: name,
       token_symbol: tokenSymbol,
+      icon_url: undefined,
+      website_url: `https://example.com/${tokenSymbol}_website`,
+      display_blockchain: "Solana",
+      explorer_url: `https://example.com/${tokenSymbol}_explorer`,
     },
     "*"
   );

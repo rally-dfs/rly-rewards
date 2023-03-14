@@ -1,7 +1,6 @@
 import { getKnex } from "./database";
 
 import { TrackedTokenAccount } from "./knex-types/tracked_token_account";
-import { TrackedTokenAccountBalance } from "./knex-types/tracked_token_account_balance";
 import { TrackedTokenAccountTransaction } from "./knex-types/tracked_token_account_transaction";
 import { TrackedTokenAccountBalanceChange } from "./knex-types/tracked_token_account_balance_change";
 import { TrackedTokenChain } from "./knex-types/tracked_token";
@@ -96,7 +95,29 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
 
   const allTrackedTokenIds = Object.keys(tokenAccountsByToken);
 
-  const balancesByDateByTokenId = await getBalancesByDateByTokenId(lastEndDate);
+  // TODO: tracked_token_account_balances got too big and stopped working
+  // it was less work to just remove this instead of actually removing it from all the subsequent code
+  // and cleaning it up, but we should do that if we ever revive this code
+  // const balancesByDateByTokenId = await getBalancesByDateByTokenId(lastEndDate);
+
+  // TODO: tracked_token_account_balances got too big and stopped working
+  // using max(transaction) date as the easiest stopgap, should rethink this if we revive this
+  const maxTransactionDatesAndTokenIds: {
+    token_id: number;
+    latest_date: Date;
+  }[] = await knex("tracked_token_account_transactions")
+    .select("tracked_token_accounts.token_id")
+    .max("datetime as latest_date")
+    .join(
+      "tracked_token_accounts",
+      "tracked_token_accounts.id",
+      "tracked_token_account_transactions.tracked_token_account_id"
+    )
+    .groupBy("tracked_token_accounts.token_id");
+
+  const maxTransactionDateByTokenId = Object.fromEntries(
+    maxTransactionDatesAndTokenIds.map((row) => [row.token_id, row.latest_date])
+  );
 
   for (let i = 0; i < allTrackedTokenIds.length; i++) {
     const tokenId = allTrackedTokenIds[i]!;
@@ -105,6 +126,11 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
     const chain = tokenAccountsByToken[tokenId]!.chain;
     const accountIdsByAddress =
       tokenAccountsByToken[tokenId]!.accountIdsByAddress!;
+
+    /*
+    // TODO: tracked_token_account_balances got too big and stopped working
+    // it was less work to just remove this instead of actually removing it from all the subsequent code
+    // and cleaning it up, but we should do that if we ever revive this code
 
     // just use an empty object {} for the very first data fetch for this token
     const balancesByDate = balancesByDateByTokenId[tokenId] || {};
@@ -126,6 +152,9 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
     const maxDate = Object.keys(balancesByDate)[0]
       ? new Date(Object.keys(balancesByDate)[0]!)
       : undefined;
+    */
+
+    const maxDate = maxTransactionDateByTokenId[tokenId];
     const maxDatePlusOne = maxDate
       ? new Date(
           new Date(
@@ -148,7 +177,7 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
         decimals,
         chain,
         accountIdsByAddress,
-        balancesByDate,
+        {}, // TODO: tracked_token_account_balances got too big and stopped working, just removed this
         currentEndDate
       );
 
@@ -157,11 +186,15 @@ export async function getAllTrackedTokenAccountInfoAndTransactionsForEndDate(
   }
 }
 
+// TODO: tracked_token_account_balances got too big and stopped working
+// it was less work to just remove this instead of actually removing it from all the subsequent code
+// and cleaning it up, but we should do that if we ever revive this code
 /** This is mostly used as an internal helper but can be useful for sanity checking consistency also
  *
  * @param lastEndDate
  * @returns
  */
+/*
 export async function getBalancesByDateByTokenId(lastEndDate: Date) {
   const knex = getKnex();
 
@@ -213,6 +246,7 @@ export async function getBalancesByDateByTokenId(lastEndDate: Date) {
 
   return balancesByDateByTokenId;
 }
+*/
 
 /** Helper function that fetches account info for `end date minus 24 hours` to `endDate` and inserts into DB.
  * Would need to refactor better to make it usable externally (it currently requires some specific set up/data
@@ -225,7 +259,7 @@ export async function getBalancesByDateByTokenId(lastEndDate: Date) {
  * @param accountIdsByAddress Dictionary of {account_address: db_id}. Will be updated with any new accounts fetched and
  * inserted into the DB during this run (needed for future calls of this function)
  * @param balancesByDate Dictionary of {date: {account_id: balance}}. Will be updated with `endDateExclusive`'s
- * new balance data (needed for future calls of this function)
+ * new balance data (needed for future calls of this function) (deprecated/not working)
  * @param endDateExclusive
  */
 async function _getTrackedTokenAccountInfoForMintAndEndDate(
@@ -234,7 +268,7 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
   decimals: number,
   chain: TrackedTokenChain,
   accountIdsByAddress: { [key: string]: string },
-  balancesByDate: { [key: string]: { [key: string]: string } },
+  _balancesByDate: { [key: string]: { [key: string]: string } },
   endDateExclusive: Date
 ) {
   const knex = getKnex();
@@ -347,6 +381,10 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
     }
   }
 
+  // TODO: tracked_token_account_balances got too big and stopped working
+  // it was less work to just remove this instead of actually removing it from all the subsequent code
+  // and cleaning it up, but we should do that if we ever revive this code
+  /*
   // TrackedTokenAccountBalances:
   // copy previous day's balances into a new dict (we could instead do whatever most recent date has any data for a
   // given account, but seems cleaner to not skip days if there's some bug causing missing days/accounts, easier to just
@@ -386,6 +424,7 @@ async function _getTrackedTokenAccountInfoForMintAndEndDate(
 
   // update balancesByDay (just needed if we're calling this function for multiple days at once)
   balancesByDate[endDateExclusive.toISOString()] = currentDayBalances;
+  */
 
   // finally, insert the TrackedTokenAccountTransactions
   const incomingTransactionRows: TrackedTokenAccountTransaction[] = [];

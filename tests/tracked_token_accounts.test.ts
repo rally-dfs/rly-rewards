@@ -8,7 +8,6 @@ import { getKnex } from "../src/database";
 import { getAllTrackedTokenAccountInfoAndTransactionsForEndDate } from "../src/tracked_token_accounts";
 import { TrackedToken } from "../src/knex-types/tracked_token";
 import { TrackedTokenAccount } from "../src/knex-types/tracked_token_account";
-import { TrackedTokenAccountBalance } from "../src/knex-types/tracked_token_account_balance";
 import { TrackedTokenAccountTransaction } from "../src/knex-types/tracked_token_account_transaction";
 import { TrackedTokenAccountBalanceChange } from "../src/knex-types/tracked_token_account_balance_change";
 
@@ -208,6 +207,10 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
         ]);
     });
 
+    // TODO: tracked_token_account_balances got too big and stopped working
+    // it was less work to just remove this instead of actually removing it from all the subsequent code
+    // and cleaning it up, but we should do that if we ever revive this code
+    /*
     it("saves tracked token account balances for single call", async () => {
       const tokenAccountBalances = await knex<TrackedTokenAccountBalance>(
         "tracked_token_account_balances"
@@ -233,6 +236,7 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
           },
         ]);
     });
+    */
 
     it("saves tracked token account balance changes for single call", async () => {
       // changes is basically the same as balances for the first day
@@ -372,6 +376,10 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
         ]);
     });
 
+    // TODO: tracked_token_account_balances got too big and stopped working
+    // it was less work to just remove this instead of actually removing it from all the subsequent code
+    // and cleaning it up, but we should do that if we ever revive this code
+    /*
     it("saves tracked token account balances for multiple days", async () => {
       // balances for 6/2 and 6/3 should be added
       const updatedTokenAccountBalances =
@@ -449,6 +457,7 @@ describe("#getAllTrackedTokenAccountInfoAndTransactionsForEndDate", () => {
           },
         ]);
     });
+    */
 
     it("saves tracked token account balance changes for multiple days", async () => {
       // changes should only have the net new rows and not the unchanged ones

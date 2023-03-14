@@ -8,7 +8,6 @@ import {
 } from "../factories";
 import {
   rewardsDistributedToDestinationWallets,
-  rlyRewardsDistributedByWeek,
   totalRLYRewardsDistributed,
 } from "../../src/computed_metrics/rewards_distributed";
 import { TrackedTokenAccount } from "../../src/knex-types/tracked_token_account";
@@ -34,7 +33,7 @@ describe("Rewards distributed", () => {
 
   describe("Total rewards distributed", () => {
     it("returns data from the latest balance of RLY rewards wallet", async () => {
-      await knex("tracked_token_account_balances").insert([
+      await knex("tracked_token_account_balance_changes").insert([
         {
           tracked_token_account_id: otherAccount.id,
           datetime: new Date("2022-06-21"),
@@ -62,6 +61,10 @@ describe("Rewards distributed", () => {
     });
   });
 
+  // TODO: tracked_token_account_balances got too big and stopped working
+  // it was less work to just remove this instead of actually removing it from all the subsequent code
+  // and cleaning it up, but we should do that if we ever revive this code
+  /*
   describe("Rewards distributed by week", () => {
     beforeEach(async () => {
       // insert some balances for otherAccount to make sure we correctly ignore those
@@ -190,6 +193,7 @@ describe("Rewards distributed", () => {
       ]);
     });
   });
+  */
 
   describe("#rewardsDistributedToDestinationWallets", () => {
     beforeEach(async () => {
@@ -289,30 +293,50 @@ describe("Rewards distributed", () => {
           name: "Name 4",
           tokenSymbol: "SYMBOL4",
           address: "fakeAddress4",
+          iconUrl: null,
+          websiteUrl: `https://example.com/SYMBOL4_website`,
+          displayBlockchain: "Solana",
+          explorerUrl: `https://example.com/SYMBOL4_explorer`,
           total: 405,
         },
         {
           name: "Name 3",
           tokenSymbol: "SYMBOL3",
           address: "fakeAddress3",
+          iconUrl: null,
+          websiteUrl: `https://example.com/SYMBOL3_website`,
+          displayBlockchain: "Solana",
+          explorerUrl: `https://example.com/SYMBOL3_explorer`,
           total: 305,
         },
         {
           name: "Name 2",
           tokenSymbol: "SYMBOL2",
           address: "fakeAddress2",
+          iconUrl: null,
+          websiteUrl: `https://example.com/SYMBOL2_website`,
+          displayBlockchain: "Solana",
+          explorerUrl: `https://example.com/SYMBOL2_explorer`,
           total: 205,
         },
         {
           name: "Name 1",
           tokenSymbol: "SYMBOL1",
           address: "fakeAddress1",
+          iconUrl: null,
+          websiteUrl: `https://example.com/SYMBOL1_website`,
+          displayBlockchain: "Solana",
+          explorerUrl: `https://example.com/SYMBOL1_explorer`,
           total: 105,
         },
         {
           name: "Name 0",
           tokenSymbol: "SYMBOL0",
           address: "fakeAddress0",
+          iconUrl: null,
+          websiteUrl: `https://example.com/SYMBOL0_website`,
+          displayBlockchain: "Solana",
+          explorerUrl: `https://example.com/SYMBOL0_explorer`,
           total: 5,
         },
       ]);
@@ -333,30 +357,50 @@ describe("Rewards distributed", () => {
           name: "Name 4",
           tokenSymbol: "SYMBOL4",
           address: "fakeAddress4",
+          iconUrl: null,
+          websiteUrl: `https://example.com/SYMBOL4_website`,
+          displayBlockchain: "Solana",
+          explorerUrl: `https://example.com/SYMBOL4_explorer`,
           total: 163,
         },
         {
           name: "Name 3",
           tokenSymbol: "SYMBOL3",
           address: "fakeAddress3",
+          iconUrl: null,
+          websiteUrl: `https://example.com/SYMBOL3_website`,
+          displayBlockchain: "Solana",
+          explorerUrl: `https://example.com/SYMBOL3_explorer`,
           total: 123,
         },
         {
           name: "Name 2",
           tokenSymbol: "SYMBOL2",
           address: "fakeAddress2",
+          iconUrl: null,
+          websiteUrl: `https://example.com/SYMBOL2_website`,
+          displayBlockchain: "Solana",
+          explorerUrl: `https://example.com/SYMBOL2_explorer`,
           total: 83,
         },
         {
           name: "Name 1",
           tokenSymbol: "SYMBOL1",
           address: "fakeAddress1",
+          iconUrl: null,
+          websiteUrl: `https://example.com/SYMBOL1_website`,
+          displayBlockchain: "Solana",
+          explorerUrl: `https://example.com/SYMBOL1_explorer`,
           total: 43,
         },
         {
           name: "Name 0",
           tokenSymbol: "SYMBOL0",
           address: "fakeAddress0",
+          iconUrl: null,
+          websiteUrl: `https://example.com/SYMBOL0_website`,
+          displayBlockchain: "Solana",
+          explorerUrl: `https://example.com/SYMBOL0_explorer`,
           total: 3,
         },
       ]);
@@ -375,12 +419,20 @@ describe("Rewards distributed", () => {
           name: "Name 2",
           tokenSymbol: "SYMBOL2",
           address: "fakeAddress2",
+          iconUrl: null,
+          websiteUrl: `https://example.com/SYMBOL2_website`,
+          displayBlockchain: "Solana",
+          explorerUrl: `https://example.com/SYMBOL2_explorer`,
           total: 205,
         },
         {
           name: "Name 1",
           tokenSymbol: "SYMBOL1",
           address: "fakeAddress1",
+          iconUrl: null,
+          websiteUrl: `https://example.com/SYMBOL1_website`,
+          displayBlockchain: "Solana",
+          explorerUrl: `https://example.com/SYMBOL1_explorer`,
           total: 105,
         },
       ]);

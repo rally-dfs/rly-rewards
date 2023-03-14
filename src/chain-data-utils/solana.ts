@@ -1,6 +1,7 @@
 import {
   getTransactionsTriaged,
   getTransactionTriaged,
+  switchConnection,
 } from "./solana_connection";
 
 export async function getSolanaTransaction(hash: string) {
@@ -22,7 +23,7 @@ export async function getMultipleSolanaTransactionBalances(
   const results: { [key: string]: { [key: string]: number } } = {};
   const retries: { [key: string]: string[] } = {};
 
-  const chunkSize = 20;
+  const chunkSize = 10;
 
   const txnHashes = Object.keys(txnInfos);
 
@@ -43,16 +44,27 @@ export async function getMultipleSolanaTransactionBalances(
       const ownerAddresses = txnInfos[hash]!;
       ownerAddresses.forEach((tokenAccountOwnerAddress) => {
         const balances = txnInfo?.meta?.postTokenBalances?.filter(
-          (tokenInfo) =>
-            (tokenInfo.owner === tokenAccountOwnerAddress &&
-              tokenInfo.mint === tokenMintAddress) ||
+          (tokenInfo) => {
             // sometimes bitquery incorrectly returns the token address as the owner instead (think this happens if the
             // account is closed and rent removed, which messes with their scraping), so we can fall back on
             // using it as the account address instead and look it up in accountKeys
-            tokenInfo.accountIndex ==
-              txnInfo.transaction.message.accountKeys
-                .map((accountKey) => accountKey.toString())
-                .indexOf(tokenAccountOwnerAddress)
+            let isAccountIndexMatchFallback = false;
+            if (txnInfo.version == "legacy") {
+              // note this fallback logic doens't work for v0 txns, there's probably a way to make something similar
+              // work there too if we really want to, accountKeys works differently from the legacy ones
+              isAccountIndexMatchFallback =
+                tokenInfo.accountIndex ==
+                txnInfo.transaction.message.staticAccountKeys
+                  .map((accountKey) => accountKey.toString())
+                  .indexOf(tokenAccountOwnerAddress);
+            }
+
+            return (
+              (tokenInfo.owner === tokenAccountOwnerAddress &&
+                tokenInfo.mint === tokenMintAddress) ||
+              isAccountIndexMatchFallback
+            );
+          }
         );
 
         if (!balances || balances.length === 0) {
@@ -86,6 +98,9 @@ export async function getMultipleSolanaTransactionBalances(
         retries
       )}`
     );
+
+    // go ahead and switch solana connections before retrying in case one's returning bad data with one of them
+    switchConnection();
 
     const retryResults = await getMultipleSolanaTransactionBalances(
       retries,

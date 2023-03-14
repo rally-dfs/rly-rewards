@@ -9,16 +9,24 @@ const alchemyConnection = new Connection(
 );
 
 const genesysConnection = new Connection(
-  "https://ssc-dao.genesysgo.net/",
+  `https://cold-twilight-fog.solana-mainnet.discover.quiknode.pro/${process.env.QUICKNODE_SOLANA_ID}/`,
   "finalized"
 );
 
 let currentConnection = alchemyConnection;
 
+export function switchConnection() {
+  currentConnection =
+    currentConnection === alchemyConnection
+      ? genesysConnection
+      : alchemyConnection;
+}
+
 export async function getTransactionTriaged(signature: string) {
   try {
     const transaction = await currentConnection.getTransaction(signature, {
       commitment: "confirmed",
+      maxSupportedTransactionVersion: 0,
     });
     if (!transaction) {
       throw new Error(); // sometimes `null` gets returned without an error, treat that as a retry
@@ -28,16 +36,14 @@ export async function getTransactionTriaged(signature: string) {
     console.log(
       `Error with ${
         currentConnection.rpcEndpoint.split("/")[2]
-      }, trying other connection`
+      }, trying other connection. Error: ${error}`
     );
 
-    currentConnection =
-      currentConnection === alchemyConnection
-        ? genesysConnection
-        : alchemyConnection;
+    switchConnection();
 
     return await currentConnection.getTransaction(signature, {
       commitment: "confirmed",
+      maxSupportedTransactionVersion: 0,
     });
   }
 }
@@ -46,10 +52,10 @@ export async function getTransactionsTriaged(
   signatures: TransactionSignature[]
 ) {
   try {
-    const transactions = await currentConnection.getTransactions(
-      signatures,
-      "confirmed"
-    );
+    const transactions = await currentConnection.getTransactions(signatures, {
+      commitment: "confirmed",
+      maxSupportedTransactionVersion: 0,
+    });
     if (!transactions) {
       throw new Error(); // sometimes `null` gets returned without an error, treat that as a retry
     }
@@ -58,14 +64,14 @@ export async function getTransactionsTriaged(
     console.log(
       `Error with ${
         currentConnection.rpcEndpoint.split("/")[2]
-      }, trying other connection`
+      }, trying other connection. Error: ${error}`
     );
 
-    currentConnection =
-      currentConnection === alchemyConnection
-        ? genesysConnection
-        : alchemyConnection;
+    switchConnection();
 
-    return await currentConnection.getTransactions(signatures, "confirmed");
+    return await currentConnection.getTransactions(signatures, {
+      commitment: "confirmed",
+      maxSupportedTransactionVersion: 0,
+    });
   }
 }

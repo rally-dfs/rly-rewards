@@ -17,10 +17,10 @@ export async function totalRLYRewardsDistributed() {
     .select(
       knex.raw("approximate_minimum_balance / (10 ^ decimals) as balance")
     )
-    .from("tracked_token_account_balances")
+    .from("tracked_token_account_balance_changes")
     .join(
       "tracked_token_accounts",
-      "tracked_token_account_balances.tracked_token_account_id",
+      "tracked_token_account_balance_changes.tracked_token_account_id",
       "tracked_token_accounts.id"
     )
     .join(
@@ -39,6 +39,10 @@ export async function totalRLYRewardsDistributed() {
     : undefined;
 }
 
+// TODO: tracked_token_account_balances got too big and stopped working
+// it was less work to just remove this instead of actually removing it from all the subsequent code
+// and cleaning it up, but we should do that if we ever revive this code
+/*
 export async function rlyRewardsDistributedByWeek() {
   const dbResponse = await knex
     .select(
@@ -87,6 +91,7 @@ export async function rlyRewardsDistributedByWeek() {
         row.weekStart - dbResponse[index].week_start === 7 * 24 * 3600 * 1000
     );
 }
+*/
 
 /** Fetches the total rewards distributed since `startDate`, rounded to nearest whole number and sorted by total
  *
@@ -148,11 +153,19 @@ export async function rewardsDistributedToDestinationWallets(
     name: string;
     token_symbol: string;
     destination_address: string;
+    icon_url: string;
+    website_url: string;
+    display_blockchain: string;
+    explorer_url: string;
     total: number;
   }[] = await knex
     .select("rewards_destination_wallets.name")
     .select("rewards_destination_wallets.token_symbol")
     .select("rewards_destination_wallets.destination_address")
+    .select("rewards_destination_wallets.icon_url")
+    .select("rewards_destination_wallets.website_url")
+    .select("rewards_destination_wallets.display_blockchain")
+    .select("rewards_destination_wallets.explorer_url")
     .select("total")
     .from("rewards_destination_wallets")
     // use left join so we can return rewards destinations with 0 total
@@ -172,6 +185,10 @@ export async function rewardsDistributedToDestinationWallets(
       name: row.name,
       tokenSymbol: row.token_symbol,
       address: row.destination_address,
+      iconUrl: row.icon_url,
+      websiteUrl: row.website_url,
+      displayBlockchain: row.display_blockchain,
+      explorerUrl: row.explorer_url,
       total: Math.round(row.total),
     }))
     .sort((row1, row2) => row2.total - row1.total);
