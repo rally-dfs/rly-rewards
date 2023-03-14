@@ -5,7 +5,6 @@ import {
   totalActiveWallets,
   totalActiveWalletsByDay,
   totalWallets,
-  totalWalletsByDay,
 } from "../../src/computed_metrics/wallet_metrics";
 import { createAccount, createTrackedToken } from "../factories";
 
@@ -71,6 +70,10 @@ describe("Computed Wallet Metrics", () => {
       expect(await totalWallets([trackedToken, trackedToken2])).to.equal(2);
     });
 
+    // TODO: tracked_token_account_balances got too big and stopped working
+    // it was less work to just remove this instead of actually removing it from all the subsequent code
+    // and cleaning it up, but we should do that if we ever revive this code
+    /*
     it("filters out 0 balance wallets when passed function option flag", async () => {
       const account1 = await createAccount(
         trackedToken,
@@ -100,6 +103,7 @@ describe("Computed Wallet Metrics", () => {
         })
       ).to.equal(1);
     });
+    */
 
     it("does not include the same wallet address more than once per token type", async () => {
       const account1 = await createAccount(
@@ -123,6 +127,10 @@ describe("Computed Wallet Metrics", () => {
       expect(await totalWallets([trackedToken])).to.equal(1);
     });
 
+    // TODO: tracked_token_account_balances got too big and stopped working
+    // it was less work to just remove this instead of actually removing it from all the subsequent code
+    // and cleaning it up, but we should do that if we ever revive this code
+    /*
     it("supports removing balances that existed prior to a given optional start date", async () => {
       const account1 = await createAccount(
         trackedToken,
@@ -152,8 +160,13 @@ describe("Computed Wallet Metrics", () => {
         })
       ).to.equal(1);
     });
+    */
   });
 
+  // TODO: tracked_token_account_balances got too big and stopped working
+  // it was less work to just remove this instead of actually removing it from all the subsequent code
+  // and cleaning it up, but we should do that if we ever revive this code
+  /*
   describe("#totalWalletsByDay", () => {
     it("returns the total number of unique wallets by day for the given tracked tokens", async () => {
       const account1 = await createAccount(
@@ -233,6 +246,7 @@ describe("Computed Wallet Metrics", () => {
       ]);
     });
   });
+  */
 
   describe("#totalActiveWalletsByDay", () => {
     it("returns a day by day count of wallets that have sent an outbound transaction for the tokens we asked about", async () => {
