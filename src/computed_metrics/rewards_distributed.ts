@@ -17,10 +17,10 @@ export async function totalRLYRewardsDistributed() {
     .select(
       knex.raw("approximate_minimum_balance / (10 ^ decimals) as balance")
     )
-    .from("tracked_token_account_balances")
+    .from("tracked_token_account_balance_changes")
     .join(
       "tracked_token_accounts",
-      "tracked_token_account_balances.tracked_token_account_id",
+      "tracked_token_account_balance_changes.tracked_token_account_id",
       "tracked_token_accounts.id"
     )
     .join(
@@ -39,6 +39,10 @@ export async function totalRLYRewardsDistributed() {
     : undefined;
 }
 
+// TODO: tracked_token_account_balances got too big and stopped working
+// it was less work to just remove this instead of actually removing it from all the subsequent code
+// and cleaning it up, but we should do that if we ever revive this code
+/*
 export async function rlyRewardsDistributedByWeek() {
   const dbResponse = await knex
     .select(
@@ -87,6 +91,7 @@ export async function rlyRewardsDistributedByWeek() {
         row.weekStart - dbResponse[index].week_start === 7 * 24 * 3600 * 1000
     );
 }
+*/
 
 /** Fetches the total rewards distributed since `startDate`, rounded to nearest whole number and sorted by total
  *
