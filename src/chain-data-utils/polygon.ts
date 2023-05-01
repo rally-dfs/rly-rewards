@@ -5,12 +5,9 @@ import { AbiItem } from "web3-utils";
 
 const TIMEOUT_BETWEEN_CALLS = 1000;
 
-// const web3 = new Web3(
-//   `https://eth-mainnet.alchemyapi.io/v2/${process.env.ALCHEMY_ID}`
-// );
 // TODO: fix me, just placeholder testing stuff
 const web3Mumbai = new Web3(
-  `https://polygon-mumbai.g.alchemy.com/v2/${process.env.ALCHEMY_ETH_ID}`
+  `https://polygon-mumbai.g.alchemy.com/v2/${process.env.ALCHEMY_ID}`
 );
 
 // TODO: just for testing/debugging, probably dont need this method

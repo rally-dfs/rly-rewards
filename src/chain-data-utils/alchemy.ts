@@ -23,8 +23,8 @@ export async function getAllAssetTransfersByAddress(
   [key: string]: AssetTransfersWithMetadataResult[];
 }> {
   const config = {
-    apiKey: process.env.ALCHEMY_ETH_ID,
-    network: Network.MATIC_MUMBAI,
+    apiKey: process.env.ALCHEMY_ID,
+    network: Network.MATIC_MUMBAI, // TODO: change this to mainnet
   };
   const alchemy = new Alchemy(config);
 

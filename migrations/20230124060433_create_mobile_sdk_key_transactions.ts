@@ -18,6 +18,15 @@ export async function up(knex: Knex): Promise<void> {
       table.string("transaction_hash").notNullable();
       table.integer("block_number").unsigned().notNullable();
       table.datetime("datetime").notNullable();
+      // incoming if wallet is receiver in txn, outgoing if wallet is sender in txn, neither if not relevant to txn type
+      // (note a wallet could be sender and receiver in the same txn, so this is part of unique constraint below)
+      table
+        .enu("direction", ["incoming", "outgoing", "neither"], {
+          useNative: true,
+          enumName: "mobile_sdk_key_transaction_direction",
+        })
+        .notNullable()
+        .defaultTo("neither");
       // null for unlimited precision and 0 for 0 scale (store as whole numbers to match on chain values, not as
       // post-division decimals)
       table.decimal("amount", null, 0).nullable(); // nullable if not relevant to this transaction_type, e.g. `other`
@@ -28,7 +37,12 @@ export async function up(knex: Knex): Promise<void> {
       // kind of placeholder - not sure how we want to deal with multiple wallets involved in a single txn, currently
       // they would just have 2 separate DB rows (potentially with a different transaction_type)
       // we could normalize it out so we dont save redundant info like gas etc but this is probably fine for now
-      table.unique(["wallet_id", "transaction_type", "transaction_hash"]);
+      table.unique([
+        "wallet_id",
+        "transaction_type",
+        "transaction_hash",
+        "direction",
+      ]);
     }
   );
 }

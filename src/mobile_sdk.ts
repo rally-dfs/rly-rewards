@@ -4,9 +4,11 @@ import { EventData } from "web3-eth-contract";
 import { TransactionReceipt } from "web3-core";
 
 import { MobileSDKWallet } from "./knex-types/mobile_sdk_wallet";
-import { MobileSDKKeyTransaction } from "./knex-types/mobile_sdk_key_transaction";
+import {
+  MobileSDKKeyDirection,
+  MobileSDKKeyTransaction,
+} from "./knex-types/mobile_sdk_key_transaction";
 
-import PaymasterABI from "./chain-data-utils/abis/paymaster.json";
 import TokenFaucetABI from "./chain-data-utils/abis/token_faucet.json";
 
 import {
@@ -29,13 +31,13 @@ export async function getMobileSDKTransactions(
 ) {
   const knex = getKnex();
 
-  // TODO: replace with final contracts/ABIs
   const contractsAndABIs = {
     // TODO: maybe dont really need to fetch paymaster events here, can just see whether topics[0]
     // for the paymaster event exists in transactionReceipts.logs
     // (e.g. 0x8c7dc6f54401600ae78b31aec3dec125cfa5b7bcbf4ff3cbc5bfd818ba082b49 is SampleRecipientPostCall)
-    "0x327BBd6BAc3236BCAcDE0D0f4FCD08b3eDfFbc06": PaymasterABI as AbiItem[],
-    "0xD934Ac8fB32336C5a2b51dF6a97432C4De0594F3": TokenFaucetABI as AbiItem[],
+    // "0x327BBd6BAc3236BCAcDE0D0f4FCD08b3eDfFbc06": PaymasterABI as AbiItem[],
+    // "0xD934Ac8fB32336C5a2b51dF6a97432C4De0594F3": TokenFaucetABI as AbiItem[],
+    "0xe7C3BD692C77Ec0C0bde523455B9D142c49720fF": TokenFaucetABI as AbiItem[],
   };
 
   if (fromBlock === undefined) {
@@ -47,6 +49,14 @@ export async function getMobileSDKTransactions(
       .limit(1);
 
     fromBlock = dbResponse[0] ? dbResponse[0].block_number : 0;
+
+    if (fromBlock > toBlock) {
+      throw new Error(
+        "To block is less than the most recently fetched block. Specify to and from blocks explicitly."
+      );
+    }
+
+    console.log(`Using most recently fetched block ${fromBlock} as fromBlock`);
   }
 
   const { events, transactions, receipts, blocks } =
@@ -88,12 +98,11 @@ async function _createNamedKeyTransactions(
   // TODO: should make this generic and work for multiple events once we have them, kind of placeholder for now
   const claimEvents = events.filter(
     (event) =>
-      event.address === "0xD934Ac8fB32336C5a2b51dF6a97432C4De0594F3" &&
-      event.event === "Transfer"
+      event.address === "0xe7C3BD692C77Ec0C0bde523455B9D142c49720fF" &&
+      event.event === "Claim"
   );
 
-  // TODO: need to update this `event.returnValues.to` logic once we have the Claim event
-  const walletAddresses = claimEvents.map((event) => event.returnValues.to);
+  const walletAddresses = claimEvents.map((event) => event.returnValues.sender);
 
   // create or get the MSDKWallet.id wallet_id
   const walletIdsByAddress: { [key: string]: number } = {};
@@ -121,14 +130,15 @@ async function _createNamedKeyTransactions(
   // now add all the claim events as KeyTransactions
   const claimKeyTransactions: MobileSDKKeyTransaction[] = claimEvents.map(
     (event) => ({
-      wallet_id: walletIdsByAddress[event.returnValues.to]!,
+      wallet_id: walletIdsByAddress[event.returnValues.sender]!,
       transaction_type: "token_faucet_claim",
       transaction_hash: event.transactionHash,
       block_number: event.blockNumber,
       datetime: new Date(
         parseInt(blocks[event.blockNumber]?.timestamp as string) * 1000
       ),
-      amount: event.returnValues.value,
+      direction: "incoming", // token_faucet_claims are all incoming
+      amount: event.returnValues.amount,
       gas_amount: receipts[event.transactionHash]?.gasUsed.toString()!,
       gas_price: receipts[event.transactionHash]?.effectiveGasPrice.toString()!,
       // TODO: test that this handles direct calls to TokenFaucet.claim without using paymaster
@@ -146,7 +156,12 @@ async function _createNamedKeyTransactions(
         claimKeyTransactions.slice(i, i + INSERT_CHUNK_SIZE),
         "*" // need this for postgres to return the added result
       )
-      .onConflict(["wallet_id", "transaction_type", "transaction_hash"])
+      .onConflict([
+        "wallet_id",
+        "transaction_type",
+        "transaction_hash",
+        "direction",
+      ])
       .merge();
   }
   return claimKeyTransactions;
@@ -165,6 +180,10 @@ async function _createAllOtherKeyTransactions(
     "id",
     "address"
   );
+
+  const walletAddressesByWalletId: {
+    [key: number]: string;
+  } = Object.fromEntries(allWallets.map((row) => [row.id, row.address]));
 
   const allAssetTransfersByAddress = await getAllAssetTransfersByAddress(
     allWallets.map((row) => row.address),
@@ -187,7 +206,7 @@ async function _createAllOtherKeyTransactions(
     ),
   ]);
 
-  // make sure we filter out the named transactions that we created above
+  // build helper object to use to filter out the named transactions that we created above
   // (this assumes the same block range was used for the named txns as was used above)
   let namedTransactionHashesByWalletId: { [key: number]: Set<string> } = {};
   namedKeyTransactionsCreated.forEach((txn) => {
@@ -216,6 +235,15 @@ async function _createAllOtherKeyTransactions(
           transaction_hash: assetTransfer.hash,
           block_number: parseInt(assetTransfer.blockNum),
           datetime: new Date(assetTransfer.metadata.blockTimestamp),
+          direction: (assetTransfer.to &&
+          assetTransfer.to.toLowerCase() ===
+            walletAddressesByWalletId[parseInt(walletId)]?.toLowerCase()
+            ? "incoming"
+            : assetTransfer.from &&
+              assetTransfer.from.toLowerCase() ===
+                walletAddressesByWalletId[parseInt(walletId)]?.toLowerCase()
+            ? "outgoing"
+            : "neither") as MobileSDKKeyDirection,
           amount: undefined,
           gas_amount:
             allAssetTransferReceipts[assetTransfer.hash]?.gasUsed.toString()!,
@@ -239,7 +267,12 @@ async function _createAllOtherKeyTransactions(
         otherKeyTransactions.slice(i, i + INSERT_CHUNK_SIZE),
         "*" // need this for postgres to return the added result
       )
-      .onConflict(["wallet_id", "transaction_type", "transaction_hash"])
+      .onConflict([
+        "wallet_id",
+        "transaction_type",
+        "transaction_hash",
+        "direction",
+      ])
       .merge();
   }
 }
