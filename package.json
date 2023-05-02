@@ -17,7 +17,8 @@
     "get-daily-liquidity-balances": "ts-node ./scripts/get_daily_liquidity_balances.ts",
     "add-tracked-token": "ts-node ./scripts/add_tracked_token.ts",
     "get-tracked-token-accounts-info": "ts-node ./scripts/get_tracked_token_accounts_info.ts",
-    "add-rewards-destination-wallet": "ts-node ./scripts/add_rewards_destination_wallet.ts"
+    "add-rewards-destination-wallet": "ts-node ./scripts/add_rewards_destination_wallet.ts",
+    "get-mobile-sdk-transactions": "ts-node ./scripts/get_mobile_sdk_transactions.ts"
   },
   "engines": {
     "node": "16.14.2"
