@@ -1,5 +1,13 @@
 [
   {
+    "inputs": [
+      { "internalType": "address", "name": "_target", "type": "address" },
+      { "internalType": "bytes4", "name": "_method", "type": "bytes4" }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
     "anonymous": false,
     "inputs": [
       {
@@ -23,24 +31,91 @@
     "inputs": [
       {
         "indexed": false,
-        "internalType": "bool",
-        "name": "success",
-        "type": "bool"
+        "internalType": "bytes",
+        "name": "txHash",
+        "type": "bytes"
       },
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "actualCharge",
+        "name": "clientId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "gasUsed",
         "type": "uint256"
       }
     ],
-    "name": "SampleRecipientPostCall",
+    "name": "RLYPaymasterPostCallValues",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "bytes",
+        "name": "txHash",
+        "type": "bytes"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "relay",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "from",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes4",
+        "name": "method",
+        "type": "bytes4"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "baseRelayFee",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "gasLimit",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes",
+        "name": "approvalData",
+        "type": "bytes"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "maxPossibleGas",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "clientId",
+        "type": "uint256"
+      }
+    ],
+    "name": "RLYPaymasterPreCallValues",
     "type": "event"
   },
   {
     "anonymous": false,
     "inputs": [],
-    "name": "SampleRecipientPreCall",
+    "name": "WhiteListMethodSet",
     "type": "event"
   },
   {
@@ -76,13 +151,6 @@
     "name": "PRE_RELAYED_CALL_GAS_LIMIT",
     "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
     "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "deposit",
-    "outputs": [],
-    "stateMutability": "payable",
     "type": "function"
   },
   {
@@ -131,6 +199,20 @@
     "inputs": [],
     "name": "getTrustedForwarder",
     "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+    "name": "methodWhiteList",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "ignoreTrustedForwarder",
+        "type": "bool"
+      },
+      { "internalType": "bool", "name": "isAllowed", "type": "bool" }
+    ],
     "stateMutability": "view",
     "type": "function"
   },
@@ -282,6 +364,22 @@
   },
   {
     "inputs": [
+      { "internalType": "address", "name": "target", "type": "address" },
+      { "internalType": "bytes4", "name": "method", "type": "bytes4" },
+      {
+        "internalType": "bool",
+        "name": "_ignoreTrustedForwarder",
+        "type": "bool"
+      },
+      { "internalType": "bool", "name": "_isAllowed", "type": "bool" }
+    ],
+    "name": "setMethodWhitelist",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
       { "internalType": "contract IRelayHub", "name": "hub", "type": "address" }
     ],
     "name": "setRelayHub",
@@ -321,19 +419,6 @@
     "name": "versionPaymaster",
     "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
     "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address payable",
-        "name": "destination",
-        "type": "address"
-      }
-    ],
-    "name": "withdrawAll",
-    "outputs": [],
-    "stateMutability": "nonpayable",
     "type": "function"
   },
   {

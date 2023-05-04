@@ -1,5 +1,5 @@
 import Web3 from "web3";
-import { AbiType } from "web3-utils";
+import { AbiType, AbiItem } from "web3-utils";
 
 const TIMEOUT_BETWEEN_CALLS = 1000;
 
@@ -25,6 +25,28 @@ export async function getERC20BalanceAtBlock(
 ): Promise<string> {
   const contract = new web3.eth.Contract(balanceOfABI, tokenAddress);
   return contract.methods.balanceOf(address).call({}, blockNumber);
+}
+
+/** Helper function to decode logs given a contract ABI and event name
+ *
+ * @param contractABI
+ * @param eventName
+ * @param dataHexString
+ * @param topics
+ */
+export function decodeLogWithABIAndEventName(
+  contractABI: AbiItem[],
+  eventName: string,
+  dataHexString: string,
+  topics: string[]
+) {
+  const inputsArray = contractABI.find(
+    (abiItem) => abiItem.type === "event" && abiItem.name === eventName
+  )?.inputs;
+  if (!inputsArray) {
+    return undefined;
+  }
+  return web3.eth.abi.decodeLog(inputsArray, dataHexString, topics);
 }
 
 export async function getERC20BalancesForAddressesAtBlocks(

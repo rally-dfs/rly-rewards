@@ -9,6 +9,7 @@ import {
   MobileSDKKeyTransaction,
 } from "./knex-types/mobile_sdk_key_transaction";
 
+import RLYPaymasterABI from "./chain-data-utils/abis/paymaster.json";
 import TokenFaucetABI from "./chain-data-utils/abis/token_faucet.json";
 
 import {
@@ -20,6 +21,8 @@ import { getAllAssetTransfersByAddress } from "./chain-data-utils/alchemy";
 import { AssetTransfersWithMetadataResult } from "alchemy-sdk";
 import { MobileSDKKeyTransactionType } from "./knex-types/mobile_sdk_key_transaction";
 import { BlockTransactionString } from "web3-eth";
+import { decodeLogWithABIAndEventName } from "./chain-data-utils/ethereum";
+import { MobileSDKClientApp } from "./knex-types/mobile_sdk_client_app";
 
 // from testing, there's a ~10K row insert limit, split the inserts into chunks in case there's too many (probably
 // would mostly only happen with transactions)
@@ -27,7 +30,9 @@ const INSERT_CHUNK_SIZE = 10000;
 
 const TOKEN_FAUCET_ADDRESS = "0xe7C3BD692C77Ec0C0bde523455B9D142c49720fF";
 
-const EVENT_TOPIC_RLYPAYMASTERPOSTCALLVALUES =
+const EVENT_TOPIC_RLY_PAYMASTER_PRE_CALL_VALUES =
+  "0x316c3804bae99d0dfbb6f7bbac42276350e161e4a35e251084448c255f1c8704";
+const EVENT_TOPIC_RLY_PAYMASTER_POST_CALL_VALUES =
   "0xade5d601b68375ded0f1639e57b7b3538b90c7f0e380e8e9152361f6e1289da5";
 
 export async function getMobileSDKTransactions(
@@ -82,8 +87,6 @@ export async function getMobileSDKTransactions(
     fromBlock,
     toBlock
   );
-
-  // TODO: fill out wallet.clientAppId attribution based on paymaster events
 }
 
 /** Checks for the RlyPaymasterPostCallValues event for a given txn receipt
@@ -96,12 +99,20 @@ function _gasPaidByRna(receipt: TransactionReceipt) {
     receipt.logs.findIndex(
       (log) =>
         log.topics.findIndex(
-          (topic) => topic === EVENT_TOPIC_RLYPAYMASTERPOSTCALLVALUES
+          (topic) => topic === EVENT_TOPIC_RLY_PAYMASTER_POST_CALL_VALUES
         ) >= 0
     ) >= 0
   );
 }
 
+/** Creates mobile_sdk_key_transactions for all the non-"other" events in `events`, with the help of metadata fetched in
+ * `blocks` and `receipts`
+ *
+ * @param events events from result of getEventsTransactionReceiptsAndBlocksFromContracts
+ * @param blocks blocks from result of getEventsTransactionReceiptsAndBlocksFromContracts
+ * @param receipts receipts from result of getEventsTransactionReceiptsAndBlocksFromContracts
+ * @returns the list of MobileSDKKeyTransactions created
+ */
 async function _createNamedKeyTransactions(
   events: EventData[],
   blocks: { [key: number]: BlockTransactionString },
@@ -125,7 +136,6 @@ async function _createNamedKeyTransactions(
     const walletResults = await knex<MobileSDKWallet>("mobile_sdk_wallets")
       .insert(
         walletAddresses.slice(i, i + INSERT_CHUNK_SIZE).map((address) => ({
-          // TODO: need to also handle saving client_app but we can do that later (or in a different function)
           address: address,
         })),
         "*" // need this for postgres to return the added result
@@ -176,9 +186,23 @@ async function _createNamedKeyTransactions(
       ])
       .merge();
   }
+
+  // we should also call _createClientAppsFromReceipts here to create the MobileSDKClientApp objects
+  // but we do that for all txns (including the ones just created above) in _createAllOtherKeyTransactions already
+  // so would just be redundant to do it here also
+
   return claimKeyTransactions;
 }
 
+/** Creates "other" mobile_sdk_key_transactions, excluding all non-"other" key_transactions already created in
+ * namedKeyTransactionsCreated. Note the block range must match the call to _createNamedKeyTransactions or
+ * the categorization might not work properly
+ *
+ * @param namedKeyTransactionsCreated list of MobileSDKKeyTransaction already created by a call to
+ * _createNamedKeyTransactions with the same block range
+ * @param fromBlock
+ * @param toBlock
+ */
 async function _createAllOtherKeyTransactions(
   namedKeyTransactionsCreated: MobileSDKKeyTransaction[],
   fromBlock: number,
@@ -210,7 +234,7 @@ async function _createAllOtherKeyTransactions(
   );
 
   // get txn receipts for the "other" asset transfers
-  const allAssetTransferReceipts = await getTransactionReceiptsBatched([
+  const allTransferReceiptsByTxnHash = await getTransactionReceiptsBatched([
     ...new Set(
       Object.values(allAssetTransfersByWalletId)
         .flat()
@@ -258,14 +282,16 @@ async function _createAllOtherKeyTransactions(
             : "neither") as MobileSDKKeyDirection,
           amount: undefined,
           gas_amount:
-            allAssetTransferReceipts[assetTransfer.hash]?.gasUsed.toString()!,
+            allTransferReceiptsByTxnHash[
+              assetTransfer.hash
+            ]?.gasUsed.toString()!,
           gas_price:
-            allAssetTransferReceipts[
+            allTransferReceiptsByTxnHash[
               assetTransfer.hash
             ]?.effectiveGasPrice.toString()!,
           // if we can't find the receipts treat it as fatal, gas_paid_by_rna more important than some of the metadata above
           gas_paid_by_rna: _gasPaidByRna(
-            allAssetTransferReceipts[assetTransfer.hash]!
+            allTransferReceiptsByTxnHash[assetTransfer.hash]!
           ),
         }))
     )
@@ -287,4 +313,140 @@ async function _createAllOtherKeyTransactions(
       ])
       .merge();
   }
+
+  await _createClientAppsFromReceipts(
+    walletAddressesByWalletId,
+    allTransferReceiptsByTxnHash
+  );
+}
+
+/** Helper function that extracts the client_id from RLYPaymasterPreCallValues event data for all
+ * the wallets in `walletAddressesByWalletId` where it exists
+ *
+ * @param walletAddressesByWalletId
+ * @param receiptsByTxnHash
+ */
+function _getClientIdByWalletIdDict(
+  walletAddressesByWalletId: {
+    [key: number]: string;
+  },
+  receiptsByTxnHash: { [key: string]: TransactionReceipt }
+) {
+  const walletIdsByWalletAddresses = Object.fromEntries(
+    Object.entries(walletAddressesByWalletId).map(
+      ([walletId, walletAddress]) => [walletAddress, parseInt(walletId)]
+    )
+  );
+
+  // create {walletId: clientId} map by getting clientId from RLYPaymasterPreCallValues event data
+  const clientIdByWalletId: { [key: number]: string } = {};
+
+  Object.entries(receiptsByTxnHash).forEach(([txnHash, receipt]) => {
+    const paymasterPreCallLog = receipt.logs.find(
+      (log) =>
+        log.topics.findIndex(
+          (topic) => topic === EVENT_TOPIC_RLY_PAYMASTER_PRE_CALL_VALUES
+        ) >= 0
+    );
+
+    if (!paymasterPreCallLog) {
+      return; // e.g. RNA didn't pay for gas for this txn
+    }
+
+    paymasterPreCallLog.data;
+    const decodedData = decodeLogWithABIAndEventName(
+      RLYPaymasterABI as AbiItem[],
+      "RLYPaymasterPreCallValues",
+      paymasterPreCallLog.data,
+      paymasterPreCallLog.topics
+    );
+
+    if (
+      !decodedData ||
+      !decodedData.from ||
+      !decodedData.clientId ||
+      !walletIdsByWalletAddresses[decodedData.from]
+    ) {
+      // some error decoding, ok to just skip for now and try again later
+      console.error(`Error decoding log data for ${txnHash}`);
+      return;
+    }
+
+    const walletId = walletIdsByWalletAddresses[decodedData.from];
+    if (
+      clientIdByWalletId[walletId!] &&
+      clientIdByWalletId[walletId!] !== decodedData.clientId
+    ) {
+      // probably okay to treat this as fatal, don't think it should really ever happen so should investigate manually
+      throw new Error(
+        `Multiple clientIds found for walletId ${walletId}: ${
+          clientIdByWalletId[walletId!]
+        } and ${decodedData.clientId}`
+      );
+    }
+    clientIdByWalletId[walletId!] = decodedData.clientId;
+  });
+
+  console.log(`clientIdByWalletId ${JSON.stringify(clientIdByWalletId)}`);
+
+  return clientIdByWalletId;
+}
+
+/** Creates MobileSDKClientApps (if they dont already exist) and updates MobileSDKWallet.client_app_id for all
+ * the wallets in `walletAddressesByWalletId` (based on the event data in `receiptsByTxnHash`)
+ *
+ * @param walletAddressesByWalletId
+ * @param receiptsByTxnHash
+ * @returns
+ */
+async function _createClientAppsFromReceipts(
+  walletAddressesByWalletId: {
+    [key: number]: string;
+  },
+  receiptsByTxnHash: { [key: string]: TransactionReceipt }
+) {
+  const knex = getKnex();
+
+  const clientIdByWalletId = _getClientIdByWalletIdDict(
+    walletAddressesByWalletId,
+    receiptsByTxnHash
+  );
+
+  if (!clientIdByWalletId) {
+    return; // no new clientIds found
+  }
+
+  // create or get all client_ids
+  await knex<MobileSDKClientApp>("mobile_sdk_client_apps")
+    .insert(
+      [...new Set(Object.values(clientIdByWalletId))].map((clientId) => ({
+        client_id: clientId,
+      }))
+    )
+    .onConflict(["client_id"])
+    .ignore();
+
+  const dbResponse = await knex<MobileSDKClientApp>(
+    "mobile_sdk_client_apps"
+  ).select("*");
+  const clientDbIdsByClientId: { [key: string]: number } = Object.fromEntries(
+    dbResponse.map((row) => [row.client_id, row.id!])
+  );
+
+  console.log(`${JSON.stringify(clientDbIdsByClientId)} clientDbIdsByClientId`);
+
+  // update client_app_id columns for wallets in clientIdByWalletId
+  const caseIfClause = Object.entries(clientIdByWalletId)
+    .map(
+      ([walletId, clientId]) =>
+        // e.g. "WHEN 123 THEN 1", used in raw DB update below
+        `WHEN ${walletId} THEN ${clientDbIdsByClientId[clientId]!}`
+    )
+    .join(" ");
+
+  await knex<MobileSDKWallet>("mobile_sdk_wallets")
+    .update({
+      client_app_id: knex.raw(`CASE id ${caseIfClause} ELSE NULL END`),
+    })
+    .whereIn("id", Object.keys(clientIdByWalletId));
 }
