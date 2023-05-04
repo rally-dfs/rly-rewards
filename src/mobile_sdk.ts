@@ -1,4 +1,5 @@
 import { getKnex } from "./database";
+import { Knex } from "knex";
 import { AbiItem } from "web3-utils";
 import { EventData } from "web3-eth-contract";
 import { TransactionReceipt } from "web3-core";
@@ -41,12 +42,43 @@ export async function getMobileSDKTransactions(
 ) {
   const knex = getKnex();
 
+  await knex
+    .transaction(async (knexTransaction) => {
+      // run all of this in a single db transaction, since if the key transactions and the
+      // other transactions get out of sync it can cause gaps for future fetches
+      await _getMobileSDKTransactionsAtomic(
+        knexTransaction,
+        toBlock,
+        fromBlock
+      );
+    })
+    .then(() => {
+      console.log(
+        `Finished fetching Mobile SDK Transactions from ${
+          fromBlock ? fromBlock : "last"
+        } to ${toBlock}`
+      );
+    })
+    .catch((error) => {
+      console.log(
+        `Error fetching Mobile SDK Transactions from ${
+          fromBlock ? fromBlock : "last"
+        } to ${toBlock}: ${error}`
+      );
+    });
+}
+
+async function _getMobileSDKTransactionsAtomic(
+  knexTransaction: Knex.Transaction,
+  toBlock: number,
+  fromBlock?: number
+) {
   const contractsAndABIs = {
     [TOKEN_FAUCET_ADDRESS]: TokenFaucetABI as AbiItem[],
   };
 
   if (fromBlock === undefined) {
-    const dbResponse = await knex<MobileSDKKeyTransaction>(
+    const dbResponse = await knexTransaction<MobileSDKKeyTransaction>(
       "mobile_sdk_key_transactions"
     )
       .select("block_number")
@@ -80,9 +112,15 @@ export async function getMobileSDKTransactions(
   console.log(`blocks ${JSON.stringify(blocks)}`);
 
   const namedKeyTransactionsCreated: MobileSDKKeyTransaction[] =
-    await _createNamedKeyTransactions(events, blocks, receipts);
+    await _createNamedKeyTransactions(
+      knexTransaction,
+      events,
+      blocks,
+      receipts
+    );
 
   await _createAllOtherKeyTransactions(
+    knexTransaction,
     namedKeyTransactionsCreated,
     fromBlock,
     toBlock
@@ -114,12 +152,11 @@ function _gasPaidByRna(receipt: TransactionReceipt) {
  * @returns the list of MobileSDKKeyTransactions created
  */
 async function _createNamedKeyTransactions(
+  knexTransaction: Knex.Transaction,
   events: EventData[],
   blocks: { [key: number]: BlockTransactionString },
   receipts: { [key: string]: TransactionReceipt }
 ) {
-  const knex = getKnex();
-
   // iterate through all events, pick out the ones that match transaction_types we care about
   // e.g. {"TokenFaucet.Claim": MobileSDKKeyTransactionType.token_faucet_claim}
   // TODO: should make this generic and work for multiple events once we have them, kind of placeholder for now
@@ -133,7 +170,9 @@ async function _createNamedKeyTransactions(
   const walletIdsByAddress: { [key: string]: number } = {};
 
   for (let i = 0; i < walletAddresses.length; i += INSERT_CHUNK_SIZE) {
-    const walletResults = await knex<MobileSDKWallet>("mobile_sdk_wallets")
+    const walletResults = await knexTransaction<MobileSDKWallet>(
+      "mobile_sdk_wallets"
+    )
       .insert(
         walletAddresses.slice(i, i + INSERT_CHUNK_SIZE).map((address) => ({
           address: address,
@@ -173,7 +212,9 @@ async function _createNamedKeyTransactions(
   console.log(`claim key transactions ${JSON.stringify(claimKeyTransactions)}`);
 
   for (let i = 0; i < claimKeyTransactions.length; i += INSERT_CHUNK_SIZE) {
-    await knex<MobileSDKKeyTransaction>("mobile_sdk_key_transactions")
+    await knexTransaction<MobileSDKKeyTransaction>(
+      "mobile_sdk_key_transactions"
+    )
       .insert(
         claimKeyTransactions.slice(i, i + INSERT_CHUNK_SIZE),
         "*" // need this for postgres to return the added result
@@ -204,18 +245,16 @@ async function _createNamedKeyTransactions(
  * @param toBlock
  */
 async function _createAllOtherKeyTransactions(
+  knexTransaction: Knex.Transaction,
   namedKeyTransactionsCreated: MobileSDKKeyTransaction[],
   fromBlock: number,
   toBlock: number
 ) {
-  const knex = getKnex();
-
   // now that all current MSDKWallets are created, run the alchemy API to get all txns (one wallet at a time)
   // for any txns that dont exist yet, just save them as `other` (and re-fetch the datetime/gas/gas paid)
-  const allWallets = await knex<MobileSDKWallet>("mobile_sdk_wallets").select(
-    "id",
-    "address"
-  );
+  const allWallets = await knexTransaction<MobileSDKWallet>(
+    "mobile_sdk_wallets"
+  ).select("id", "address");
 
   const walletAddressesByWalletId: {
     [key: number]: string;
@@ -300,7 +339,9 @@ async function _createAllOtherKeyTransactions(
   console.log(`other key txns ${JSON.stringify(otherKeyTransactions)}`);
 
   for (let i = 0; i < otherKeyTransactions.length; i += INSERT_CHUNK_SIZE) {
-    await knex<MobileSDKKeyTransaction>("mobile_sdk_key_transactions")
+    await knexTransaction<MobileSDKKeyTransaction>(
+      "mobile_sdk_key_transactions"
+    )
       .insert(
         otherKeyTransactions.slice(i, i + INSERT_CHUNK_SIZE),
         "*" // need this for postgres to return the added result
@@ -315,6 +356,7 @@ async function _createAllOtherKeyTransactions(
   }
 
   await _createClientAppsFromReceipts(
+    knexTransaction,
     walletAddressesByWalletId,
     allTransferReceiptsByTxnHash
   );
@@ -400,13 +442,12 @@ function _getClientIdByWalletIdDict(
  * @returns
  */
 async function _createClientAppsFromReceipts(
+  knexTransaction: Knex.Transaction,
   walletAddressesByWalletId: {
     [key: number]: string;
   },
   receiptsByTxnHash: { [key: string]: TransactionReceipt }
 ) {
-  const knex = getKnex();
-
   const clientIdByWalletId = _getClientIdByWalletIdDict(
     walletAddressesByWalletId,
     receiptsByTxnHash
@@ -417,7 +458,7 @@ async function _createClientAppsFromReceipts(
   }
 
   // create or get all client_ids
-  await knex<MobileSDKClientApp>("mobile_sdk_client_apps")
+  await knexTransaction<MobileSDKClientApp>("mobile_sdk_client_apps")
     .insert(
       [...new Set(Object.values(clientIdByWalletId))].map((clientId) => ({
         client_id: clientId,
@@ -426,7 +467,7 @@ async function _createClientAppsFromReceipts(
     .onConflict(["client_id"])
     .ignore();
 
-  const dbResponse = await knex<MobileSDKClientApp>(
+  const dbResponse = await knexTransaction<MobileSDKClientApp>(
     "mobile_sdk_client_apps"
   ).select("*");
   const clientDbIdsByClientId: { [key: string]: number } = Object.fromEntries(
@@ -444,9 +485,11 @@ async function _createClientAppsFromReceipts(
     )
     .join(" ");
 
-  await knex<MobileSDKWallet>("mobile_sdk_wallets")
+  await knexTransaction<MobileSDKWallet>("mobile_sdk_wallets")
     .update({
-      client_app_id: knex.raw(`CASE id ${caseIfClause} ELSE NULL END`),
+      client_app_id: knexTransaction.raw(
+        `CASE id ${caseIfClause} ELSE NULL END`
+      ),
     })
     .whereIn("id", Object.keys(clientIdByWalletId));
 }
