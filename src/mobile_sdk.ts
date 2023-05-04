@@ -25,6 +25,11 @@ import { BlockTransactionString } from "web3-eth";
 // would mostly only happen with transactions)
 const INSERT_CHUNK_SIZE = 10000;
 
+const TOKEN_FAUCET_ADDRESS = "0xe7C3BD692C77Ec0C0bde523455B9D142c49720fF";
+
+const EVENT_TOPIC_RLYPAYMASTERPOSTCALLVALUES =
+  "0xade5d601b68375ded0f1639e57b7b3538b90c7f0e380e8e9152361f6e1289da5";
+
 export async function getMobileSDKTransactions(
   toBlock: number,
   fromBlock?: number
@@ -32,12 +37,7 @@ export async function getMobileSDKTransactions(
   const knex = getKnex();
 
   const contractsAndABIs = {
-    // TODO: maybe dont really need to fetch paymaster events here, can just see whether topics[0]
-    // for the paymaster event exists in transactionReceipts.logs
-    // (e.g. 0x8c7dc6f54401600ae78b31aec3dec125cfa5b7bcbf4ff3cbc5bfd818ba082b49 is SampleRecipientPostCall)
-    // "0x327BBd6BAc3236BCAcDE0D0f4FCD08b3eDfFbc06": PaymasterABI as AbiItem[],
-    // "0xD934Ac8fB32336C5a2b51dF6a97432C4De0594F3": TokenFaucetABI as AbiItem[],
-    "0xe7C3BD692C77Ec0C0bde523455B9D142c49720fF": TokenFaucetABI as AbiItem[],
+    [TOKEN_FAUCET_ADDRESS]: TokenFaucetABI as AbiItem[],
   };
 
   if (fromBlock === undefined) {
@@ -86,6 +86,22 @@ export async function getMobileSDKTransactions(
   // TODO: fill out wallet.clientAppId attribution based on paymaster events
 }
 
+/** Checks for the RlyPaymasterPostCallValues event for a given txn receipt
+ *
+ * @param receipt TransactionReceipt for txn
+ * @returns
+ */
+function _gasPaidByRna(receipt: TransactionReceipt) {
+  return (
+    receipt.logs.findIndex(
+      (log) =>
+        log.topics.findIndex(
+          (topic) => topic === EVENT_TOPIC_RLYPAYMASTERPOSTCALLVALUES
+        ) >= 0
+    ) >= 0
+  );
+}
+
 async function _createNamedKeyTransactions(
   events: EventData[],
   blocks: { [key: number]: BlockTransactionString },
@@ -97,9 +113,7 @@ async function _createNamedKeyTransactions(
   // e.g. {"TokenFaucet.Claim": MobileSDKKeyTransactionType.token_faucet_claim}
   // TODO: should make this generic and work for multiple events once we have them, kind of placeholder for now
   const claimEvents = events.filter(
-    (event) =>
-      event.address === "0xe7C3BD692C77Ec0C0bde523455B9D142c49720fF" &&
-      event.event === "Claim"
+    (event) => event.address === TOKEN_FAUCET_ADDRESS && event.event === "Claim"
   );
 
   const walletAddresses = claimEvents.map((event) => event.returnValues.sender);
@@ -141,10 +155,8 @@ async function _createNamedKeyTransactions(
       amount: event.returnValues.amount,
       gas_amount: receipts[event.transactionHash]?.gasUsed.toString()!,
       gas_price: receipts[event.transactionHash]?.effectiveGasPrice.toString()!,
-      // TODO: test that this handles direct calls to TokenFaucet.claim without using paymaster
-      // TODO: placeholder, need to look up event either in receipt.logs or from `events`, probably easier once the
-      // final contract is live
-      gas_paid_by_rna: true,
+      // if we can't find the receipts treat it as fatal, gas_paid_by_rna more important than some of the metadata above
+      gas_paid_by_rna: _gasPaidByRna(receipts[event.transactionHash]!),
     })
   );
 
@@ -251,10 +263,10 @@ async function _createAllOtherKeyTransactions(
             allAssetTransferReceipts[
               assetTransfer.hash
             ]?.effectiveGasPrice.toString()!,
-          // TODO: test that this handles direct calls to TokenFaucet.claim without using paymaster
-          // TODO: placeholder, need to look up event either in receipt.logs or from `events`, probably easier once the
-          // final contract is live
-          gas_paid_by_rna: true,
+          // if we can't find the receipts treat it as fatal, gas_paid_by_rna more important than some of the metadata above
+          gas_paid_by_rna: _gasPaidByRna(
+            allAssetTransferReceipts[assetTransfer.hash]!
+          ),
         }))
     )
     .flat();
