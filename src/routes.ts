@@ -13,11 +13,9 @@ import {
 } from "./computed_metrics/transaction_metrics";
 import {
   rewardsDistributedToDestinationWallets,
-  rlyRewardsDistributedByWeek,
   totalRLYRewardsDistributed,
 } from "./computed_metrics/rewards_distributed";
 import { getOffchainHardcodedData } from "./computed_metrics/offchain_hardcoded";
-import { getBalancesByDateByTokenId } from "./tracked_token_accounts";
 
 const routes = Router();
 
@@ -138,8 +136,6 @@ routes.get("/consistency_status", async (_req, res) => {
     )
     .groupBy("collateral_token_account");
 
-  const balancesByDateByTokenIdQuery = getBalancesByDateByTokenId(new Date());
-
   const tokensWithAccountsAndTxnsQuery = knex
     .select("token_id", "mint_address", "display_name")
     .max("datetime as max_datetime")
@@ -163,17 +159,12 @@ routes.get("/consistency_status", async (_req, res) => {
     .orderBy("block_number", "desc")
     .limit(1);
 
-  const [
-    pools,
-    balancesByDateByTokenId,
-    tokensWithAccountsAndTxns,
-    mobileSDKLastBlockFetched,
-  ] = await Promise.all([
-    poolsQuery,
-    balancesByDateByTokenIdQuery,
-    tokensWithAccountsAndTxnsQuery,
-    mobileSDKLastBlockFetchedQuery,
-  ]);
+  const [pools, tokensWithAccountsAndTxns, mobileSDKLastBlockFetched] =
+    await Promise.all([
+      poolsQuery,
+      tokensWithAccountsAndTxnsQuery,
+      mobileSDKLastBlockFetchedQuery,
+    ]);
 
   return res.json({
     // {mostRecentDate: [accounts]}
@@ -189,14 +180,14 @@ routes.get("/consistency_status", async (_req, res) => {
     // just general token account info
     tokensWithAccountsAndTxns,
 
-    // {tokenId: [recentDates]}
-    // useful for checking there there's only 1 most recent balance date per token
-    // (if there's > 1, that means there's some inconsistency in TrackedTokenAccountBalance table)
-    uniqueLatestTokenBalanceDates: Object.fromEntries(
-      Object.entries(balancesByDateByTokenId).map(
-        ([tokenId, balancesByDate]) => [tokenId, Object.keys(balancesByDate)]
-      )
-    ),
+    // // {tokenId: [recentDates]}
+    // // useful for checking there there's only 1 most recent balance date per token
+    // // (if there's > 1, that means there's some inconsistency in TrackedTokenAccountBalance table)
+    // uniqueLatestTokenBalanceDates: Object.fromEntries(
+    //   Object.entries(balancesByDateByTokenId).map(
+    //     ([tokenId, balancesByDate]) => [tokenId, Object.keys(balancesByDate)]
+    //   )
+    // ),
 
     // {mostRecentDate: [mintAddresses]}
     // useful for seeing if a specific tracked token is behind (could also use TrackedTokenAccountBalance data
@@ -221,10 +212,6 @@ routes.get("/vanity_metrics", async (_req, res) => {
     "liquidity_collateral_tokens"
   );
 
-  // totalWallets uses the balances table which is quite large, so put some time bounds
-  // for performance optimization
-  const weekAgo = new Date(new Date().valueOf() - 7 * 24 * 3600 * 1000);
-
   const [
     onchainWalletCount,
     onchainTransactionCount,
@@ -232,17 +219,13 @@ routes.get("/vanity_metrics", async (_req, res) => {
     onchainTvl,
     tvlByDay,
     totalRewardsDistributed,
-    rewardsByWeek,
   ] = await Promise.all([
-    // totalWallets will return the same result no matter which start date assuming no data consistency
-    // issues (since token balances has a row for every day). use 7 days to be extra safe
-    totalWallets(allTrackedTokens, { startDate: weekAgo }),
+    totalWallets(allTrackedTokens),
     totalTransactions(allTrackedTokens),
     transactionsByDay(allTrackedTokens),
     totalValueLockedInPools(allLiquidityCollateralTokens),
     valueLockedByDay(allLiquidityCollateralTokens),
     totalRLYRewardsDistributed(),
-    rlyRewardsDistributedByWeek(),
   ]);
 
   // add the hardcoded metrics for vanity only
@@ -260,7 +243,6 @@ routes.get("/vanity_metrics", async (_req, res) => {
     tvl: tvl,
     tvlByDay: tvlByDay,
     totalRewards: totalRewardsDistributed,
-    rewardsByWeek,
   });
 });
 

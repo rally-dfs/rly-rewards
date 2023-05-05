@@ -8,7 +8,6 @@ import {
 } from "../factories";
 import {
   rewardsDistributedToDestinationWallets,
-  rlyRewardsDistributedByWeek,
   totalRLYRewardsDistributed,
 } from "../../src/computed_metrics/rewards_distributed";
 import { TrackedTokenAccount } from "../../src/knex-types/tracked_token_account";
@@ -34,7 +33,7 @@ describe("Rewards distributed", () => {
 
   describe("Total rewards distributed", () => {
     it("returns data from the latest balance of RLY rewards wallet", async () => {
-      await knex("tracked_token_account_balances").insert([
+      await knex("tracked_token_account_balance_changes").insert([
         {
           tracked_token_account_id: otherAccount.id,
           datetime: new Date("2022-06-21"),
@@ -62,6 +61,10 @@ describe("Rewards distributed", () => {
     });
   });
 
+  // TODO: tracked_token_account_balances got too big and stopped working
+  // it was less work to just remove this instead of actually removing it from all the subsequent code
+  // and cleaning it up, but we should do that if we ever revive this code
+  /*
   describe("Rewards distributed by week", () => {
     beforeEach(async () => {
       // insert some balances for otherAccount to make sure we correctly ignore those
@@ -190,6 +193,7 @@ describe("Rewards distributed", () => {
       ]);
     });
   });
+  */
 
   describe("#rewardsDistributedToDestinationWallets", () => {
     beforeEach(async () => {

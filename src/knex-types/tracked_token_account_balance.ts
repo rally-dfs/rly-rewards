@@ -1,3 +1,7 @@
+// TODO: tracked_token_account_balances got too big and stopped working
+// it was less work to just remove this instead of actually removing it from all the subsequent code
+// and cleaning it up, but we should do that if we ever revive this code
+/*
 export interface TrackedTokenAccountBalance {
   id?: number;
   tracked_token_account_id: number;
@@ -10,3 +14,4 @@ export interface TrackedTokenAccountBalance {
   // number)
   approximate_minimum_balance: string;
 }
+*/

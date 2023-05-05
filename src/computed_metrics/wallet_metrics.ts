@@ -1,14 +1,15 @@
 import { TrackedToken } from "../knex-types/tracked_token";
 import { getKnex } from "..//database";
-import { accountIdsForTokens } from "./utils";
+import { idsFromModel, accountIdsForTokens } from "./utils";
 import { format } from "date-fns";
 
 const knex = getKnex();
 
-export async function totalWallets(
-  mintedTokens: TrackedToken[],
-  opts?: { startDate?: Date; removeEmptyWallets?: boolean }
-) {
+export async function totalWallets(mintedTokens: TrackedToken[]) {
+  // TODO: tracked_token_account_balances got too big and stopped working
+  // it was less work to just remove this instead of actually removing it from all the subsequent code
+  // and cleaning it up, but we should do that if we ever revive this code
+  /*
   const startDateFilter = opts?.startDate || new Date(0);
 
   const result = await knex("tracked_token_account_balances")
@@ -20,6 +21,12 @@ export async function totalWallets(
         query.where("approximate_minimum_balance", ">", 0);
       }
     });
+  */
+
+  const result = await knex
+    .from("tracked_token_accounts")
+    .count("id")
+    .whereIn("token_id", idsFromModel(mintedTokens));
 
   if (result.length < 1) {
     return -1;
@@ -28,6 +35,10 @@ export async function totalWallets(
   return parseInt(result[0]?.count);
 }
 
+// TODO: tracked_token_account_balances got too big and stopped working
+// it was less work to just remove this instead of actually removing it from all the subsequent code
+// and cleaning it up, but we should do that if we ever revive this code
+/*
 export async function totalWalletsByDay(
   trackedTokens: TrackedToken[],
   opts?: { startDate?: Date; removeEmptyWallets?: boolean }
@@ -55,6 +66,7 @@ export async function totalWalletsByDay(
     walletCount: parseInt(record.count),
   }));
 }
+*/
 
 export async function totalActiveWalletsByDay(trackedTokens: TrackedToken[]) {
   const startDateFilter = new Date(0);
