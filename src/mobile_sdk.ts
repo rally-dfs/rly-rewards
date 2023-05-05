@@ -30,7 +30,7 @@ import { MobileSDKClientApp } from "./knex-types/mobile_sdk_client_app";
 // would mostly only happen with transactions)
 const INSERT_CHUNK_SIZE = 10000;
 
-const TOKEN_FAUCET_ADDRESS = "0xe7C3BD692C77Ec0C0bde523455B9D142c49720fF";
+const TOKEN_FAUCET_ADDRESS = "0x78a0794Bb3BB06238ed5f8D926419bD8fc9546d8";
 
 const EVENT_TOPIC_RLY_PAYMASTER_PRE_CALL_VALUES =
   "0x316c3804bae99d0dfbb6f7bbac42276350e161e4a35e251084448c255f1c8704";

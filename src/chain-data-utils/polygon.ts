@@ -5,18 +5,17 @@ import { AbiItem } from "web3-utils";
 
 const TIMEOUT_BETWEEN_CALLS = 1000;
 
-// TODO: fix me, just placeholder testing stuff
-const web3Mumbai = new Web3(
-  `https://polygon-mumbai.g.alchemy.com/v2/${process.env.ALCHEMY_ID}`
+const web3 = new Web3(
+  `https://polygon-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_ID}`
 );
 
 export async function getBlockNumber() {
-  return await web3Mumbai.eth.getBlockNumber();
+  return await web3.eth.getBlockNumber();
 }
 
 // TODO: just for testing/debugging, probably dont need this method
 async function _getTransactionsBatched(allTransactionHashes: string[]) {
-  const batch = new web3Mumbai.BatchRequest();
+  const batch = new web3.BatchRequest();
 
   const chunkSize = 17; // 17 CU * 17 calls = 289 CU (limit is ~330 CU/s)
 
@@ -45,7 +44,7 @@ async function _getTransactionsBatched(allTransactionHashes: string[]) {
       transactionHashesChunk.forEach((hash) => {
         batch.add(
           // 15 alchemy CU
-          (web3Mumbai.eth.getTransaction as any).request(hash, callback)
+          (web3.eth.getTransaction as any).request(hash, callback)
         );
       });
 
@@ -62,7 +61,7 @@ async function _getTransactionsBatched(allTransactionHashes: string[]) {
 export async function getTransactionReceiptsBatched(
   allTransactionHashes: string[]
 ) {
-  const batch = new web3Mumbai.BatchRequest();
+  const batch = new web3.BatchRequest();
 
   const chunkSize = 20; // 15 CU * 20 calls = 300 CU (limit is ~330 CU/s)
 
@@ -91,7 +90,7 @@ export async function getTransactionReceiptsBatched(
       transactionHashesChunk.forEach((hash) => {
         batch.add(
           // 15 alchemy CU
-          (web3Mumbai.eth.getTransactionReceipt as any).request(hash, callback)
+          (web3.eth.getTransactionReceipt as any).request(hash, callback)
         );
       });
 
@@ -106,7 +105,7 @@ export async function getTransactionReceiptsBatched(
 }
 
 async function _getBlocksForBlockNumbers(allBlockNumbers: number[]) {
-  const batch = new web3Mumbai.BatchRequest();
+  const batch = new web3.BatchRequest();
 
   const chunkSize = 20; // 16 CU * 20 calls = 320 CU (limit is ~330 CU/s)
 
@@ -135,7 +134,7 @@ async function _getBlocksForBlockNumbers(allBlockNumbers: number[]) {
       blockNumbersChunk.forEach((blockNumber) => {
         batch.add(
           // 16 alchemy CU
-          (web3Mumbai.eth.getBlock as any).request(blockNumber, callback)
+          (web3.eth.getBlock as any).request(blockNumber, callback)
         );
       });
 
@@ -167,10 +166,7 @@ export async function getEventsTransactionReceiptsAndBlocksFromContracts(
     ([contractAddress, contractABI]) => {
       console.log(`address ${contractAddress}`);
 
-      const contract = new web3Mumbai.eth.Contract(
-        contractABI,
-        contractAddress
-      );
+      const contract = new web3.eth.Contract(contractABI, contractAddress);
 
       // TODO: need pagination/rate limiting here?
       return contract.getPastEvents("AllEvents", {
