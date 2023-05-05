@@ -20,7 +20,10 @@ export async function getAllAssetTransfersByAddress(
   fromBlock: number,
   toBlock: number
 ): Promise<{
-  [key: string]: AssetTransfersWithMetadataResult[];
+  [key: string]: {
+    is_incoming: boolean;
+    result: AssetTransfersWithMetadataResult;
+  }[];
 }> {
   const config = {
     apiKey: process.env.ALCHEMY_ID,
@@ -29,13 +32,19 @@ export async function getAllAssetTransfersByAddress(
   const alchemy = new Alchemy(config);
 
   const allAssetTransfersByAddress: {
-    [key: string]: AssetTransfersWithMetadataResult[];
+    [key: string]: {
+      is_incoming: boolean;
+      result: AssetTransfersWithMetadataResult;
+    }[];
   } = {};
 
   for (let i = 0; i < allWallets.length; i++) {
     const address = allWallets[i]!;
 
-    let allWalletAssetTransfers: AssetTransfersWithMetadataResult[] = [];
+    let allWalletAssetTransfers: {
+      is_incoming: boolean;
+      result: AssetTransfersWithMetadataResult;
+    }[] = [];
 
     let pageKey = undefined;
     // infinite loop protection instead of while(true)
@@ -62,7 +71,10 @@ export async function getAllAssetTransfersByAddress(
         )} pagekey ${pageKey}`
       );
       allWalletAssetTransfers = allWalletAssetTransfers.concat(
-        fromAssetTransfers.transfers
+        fromAssetTransfers.transfers.map((transfer) => ({
+          is_incoming: false, // is_incoming false for these instead of true like above
+          result: transfer,
+        }))
       );
 
       if (fromAssetTransfers.pageKey === undefined) {
@@ -100,7 +112,10 @@ export async function getAllAssetTransfersByAddress(
       );
 
       allWalletAssetTransfers = allWalletAssetTransfers.concat(
-        toAssetTransfers.transfers
+        toAssetTransfers.transfers.map((transfer) => ({
+          is_incoming: true, // is_incoming true for these instead of false like above
+          result: transfer,
+        }))
       );
 
       if (toAssetTransfers.pageKey === undefined) {

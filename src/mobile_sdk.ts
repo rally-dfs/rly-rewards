@@ -279,7 +279,10 @@ async function _createAllOtherKeyTransactions(
   );
 
   const allAssetTransfersByWalletId: {
-    [key: number]: AssetTransfersWithMetadataResult[];
+    [key: number]: {
+      is_incoming: boolean;
+      result: AssetTransfersWithMetadataResult;
+    }[];
   } = Object.fromEntries(
     allWallets.map((row) => [row.id, allAssetTransfersByAddress[row.address]])
   );
@@ -289,7 +292,7 @@ async function _createAllOtherKeyTransactions(
     ...new Set(
       Object.values(allAssetTransfersByWalletId)
         .flat()
-        .map((transfer) => transfer.hash)
+        .map((transfer) => transfer.result.hash)
     ),
   ]);
 
@@ -313,36 +316,30 @@ async function _createAllOtherKeyTransactions(
             // filter out the transactions that were already saved as `token_faucet_claim` type above
             !(parseInt(walletId) in namedTransactionHashesByWalletId) ||
             !namedTransactionHashesByWalletId[parseInt(walletId)]!.has(
-              assetTransfer.hash
+              assetTransfer.result.hash
             )
         )
         .map((assetTransfer) => ({
           wallet_id: parseInt(walletId),
           transaction_type: "other" as MobileSDKKeyTransactionType,
-          transaction_hash: assetTransfer.hash,
-          block_number: parseInt(assetTransfer.blockNum),
-          datetime: new Date(assetTransfer.metadata.blockTimestamp),
-          direction: (assetTransfer.to &&
-          assetTransfer.to.toLowerCase() ===
-            walletAddressesByWalletId[parseInt(walletId)]?.toLowerCase()
+          transaction_hash: assetTransfer.result.hash,
+          block_number: parseInt(assetTransfer.result.blockNum),
+          datetime: new Date(assetTransfer.result.metadata.blockTimestamp),
+          direction: (assetTransfer.is_incoming
             ? "incoming"
-            : assetTransfer.from &&
-              assetTransfer.from.toLowerCase() ===
-                walletAddressesByWalletId[parseInt(walletId)]?.toLowerCase()
-            ? "outgoing"
-            : "neither") as MobileSDKKeyDirection,
+            : "outgoing") as MobileSDKKeyDirection,
           amount: undefined,
           gas_amount:
             allTransferReceiptsByTxnHash[
-              assetTransfer.hash
+              assetTransfer.result.hash
             ]?.gasUsed.toString()!,
           gas_price:
             allTransferReceiptsByTxnHash[
-              assetTransfer.hash
+              assetTransfer.result.hash
             ]?.effectiveGasPrice.toString()!,
           // if we can't find the receipts treat it as fatal, gas_paid_by_rna more important than some of the metadata above
           gas_paid_by_rna: _gasPaidByRna(
-            allTransferReceiptsByTxnHash[assetTransfer.hash]!
+            allTransferReceiptsByTxnHash[assetTransfer.result.hash]!
           ),
         }))
     )
