@@ -29,6 +29,102 @@ routes.get("/", async (_req, res) => {
   });
 });
 
+routes.get("/mobile_sdk_metrics", async (_req, res) => {
+  // total wallets with at least 1 txn
+  const totalWalletsQuery = knex
+    .from("mobile_sdk_key_transactions")
+    .countDistinct("wallet_id as count");
+
+  // total wallets with at least 1 "faucet_claim" txn
+  const totalWalletsWithFaucetClaimQuery = knex
+    .from("mobile_sdk_key_transactions")
+    .countDistinct("wallet_id as count")
+    .where("transaction_type", "token_faucet_claim");
+
+  // total wallets with at least 1 "other" type txn
+  const totalWalletsWithOtherQuery = knex
+    .from("mobile_sdk_key_transactions")
+    .countDistinct("wallet_id as count")
+    .where("transaction_type", "other");
+
+  // total wallets with at least 1 txn with gas paid by RNA
+  const totalWalletsGasPaidQuery = knex
+    .from("mobile_sdk_key_transactions")
+    .countDistinct("wallet_id as count")
+    .where("gas_paid_by_rna", true);
+
+  // total wallets with at least 1 "faucet_claim" txn with gas paid by RNA
+  const totalWalletsWithFaucetClaimGasPaidQuery = knex
+    .from("mobile_sdk_key_transactions")
+    .countDistinct("wallet_id as count")
+    .where("gas_paid_by_rna", true)
+    .where("transaction_type", "token_faucet_claim");
+
+  // total wallets with at least 1 "other" type txn with gas paid by RNA
+  const totalWalletsWithOtherGasPaidQuery = knex
+    .from("mobile_sdk_key_transactions")
+    .countDistinct("wallet_id as count")
+    .where("gas_paid_by_rna", true)
+    .where("transaction_type", "other");
+
+  // total RLY funded with faucet_claim txns
+  const totalRLYFromFaucetClaimsQuery = knex
+    .from("mobile_sdk_key_transactions")
+    .sum("amount as total")
+    .where("transaction_type", "token_faucet_claim");
+
+  // total gas funded across all txns
+  const gasPaidByRNAQuery = knex
+    .from(
+      knex
+        .from("mobile_sdk_key_transactions")
+        .select(knex.raw("gas_amount * gas_price as gas_paid")) // TODO: probably need a nested query here
+        .where("gas_paid_by_rna", true)
+        .as("t1")
+    )
+    .sum("gas_paid as total");
+
+  // total txns
+  const totalTransactionsQuery = knex
+    .from("mobile_sdk_key_transactions")
+    .count("* as total");
+
+  const [
+    totalWallets,
+    totalWalletsWithFaucetClaim,
+    totalWalletsWithOther,
+    totalWalletsGasPaid,
+    totalWalletsWithFaucetClaimGasPaid,
+    totalWalletsWithOtherGasPaid,
+    totalRLYFromFaucetClaims,
+    gasPaidByRNA,
+    totalTransactions,
+  ] = await Promise.all([
+    totalWalletsQuery,
+    totalWalletsWithFaucetClaimQuery,
+    totalWalletsWithOtherQuery,
+    totalWalletsGasPaidQuery,
+    totalWalletsWithFaucetClaimGasPaidQuery,
+    totalWalletsWithOtherGasPaidQuery,
+    totalRLYFromFaucetClaimsQuery,
+    gasPaidByRNAQuery,
+    totalTransactionsQuery,
+  ]);
+
+  res.json({
+    totalWallets: totalWallets[0].count,
+    totalWalletsWithFaucetClaim: totalWalletsWithFaucetClaim[0].count,
+    totalWalletsWithOther: totalWalletsWithOther[0].count,
+    totalWalletsGasPaid: totalWalletsGasPaid[0].count,
+    totalWalletsWithFaucetClaimGasPaid:
+      totalWalletsWithFaucetClaimGasPaid[0].count,
+    totalWalletsWithOtherGasPaid: totalWalletsWithOtherGasPaid[0].count,
+    totalRLYFromFaucetClaims: totalRLYFromFaucetClaims[0].total,
+    gasPaidByRNAQuery: gasPaidByRNA[0].total,
+    totalTransactions: totalTransactions[0].total,
+  });
+});
+
 routes.get("/consistency_status", async (_req, res) => {
   // for latestLiquidityPoolBalances {mostRecentDate: [account]}
   const poolsQuery = knex
@@ -62,12 +158,22 @@ routes.get("/consistency_status", async (_req, res) => {
     )
     .groupBy("token_id", "mint_address", "display_name");
 
-  const [pools, balancesByDateByTokenId, tokensWithAccountsAndTxns] =
-    await Promise.all([
-      poolsQuery,
-      balancesByDateByTokenIdQuery,
-      tokensWithAccountsAndTxnsQuery,
-    ]);
+  const mobileSDKLastBlockFetchedQuery = knex("mobile_sdk_key_transactions")
+    .select("block_number")
+    .orderBy("block_number", "desc")
+    .limit(1);
+
+  const [
+    pools,
+    balancesByDateByTokenId,
+    tokensWithAccountsAndTxns,
+    mobileSDKLastBlockFetched,
+  ] = await Promise.all([
+    poolsQuery,
+    balancesByDateByTokenIdQuery,
+    tokensWithAccountsAndTxnsQuery,
+    mobileSDKLastBlockFetchedQuery,
+  ]);
 
   return res.json({
     // {mostRecentDate: [accounts]}
@@ -104,6 +210,8 @@ routes.get("/consistency_status", async (_req, res) => {
       },
       {}
     ),
+
+    mobileSDKLastBlockFetched,
   });
 });
 
