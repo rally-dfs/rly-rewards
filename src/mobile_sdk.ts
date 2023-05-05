@@ -108,20 +108,16 @@ async function _getMobileSDKTransactionsAtomic(
     console.log(`Using most recently fetched block ${fromBlock} as fromBlock`);
   }
 
-  const { events, transactions, receipts, blocks } =
+  console.log(
+    `Fetching Mobile SDK transactions from ${fromBlock} to ${toBlock}`
+  );
+
+  const { events, receipts, blocks } =
     await getEventsTransactionReceiptsAndBlocksFromContracts(
       contractsAndABIs,
       fromBlock,
       toBlock
     );
-
-  console.log(`events ${JSON.stringify(events)}`);
-  console.log(`=============`);
-  console.log(`transactions ${JSON.stringify(transactions)}`);
-  console.log(`=============`);
-  console.log(`receipts ${JSON.stringify(receipts)}`);
-  console.log(`=============`);
-  console.log(`blocks ${JSON.stringify(blocks)}`);
 
   const namedKeyTransactionsCreated: MobileSDKKeyTransaction[] =
     await _createNamedKeyTransactions(
@@ -130,6 +126,8 @@ async function _getMobileSDKTransactionsAtomic(
       blocks,
       receipts
     );
+
+  console.log("====== Finished claim txns, doing all other txns now =====");
 
   await _createAllOtherKeyTransactions(
     knexTransaction,
@@ -200,8 +198,6 @@ async function _createNamedKeyTransactions(
     }, walletIdsByAddress);
   }
 
-  console.log(`inserted walletResults ${JSON.stringify(walletIdsByAddress)}`);
-
   // now add all the claim events as KeyTransactions
   const claimKeyTransactions: MobileSDKKeyTransaction[] = claimEvents.map(
     (event) => ({
@@ -220,8 +216,6 @@ async function _createNamedKeyTransactions(
       gas_paid_by_rna: _gasPaidByRna(receipts[event.transactionHash]!),
     })
   );
-
-  console.log(`claim key transactions ${JSON.stringify(claimKeyTransactions)}`);
 
   for (let i = 0; i < claimKeyTransactions.length; i += INSERT_CHUNK_SIZE) {
     await knexTransaction<MobileSDKKeyTransaction>(
@@ -345,8 +339,6 @@ async function _createAllOtherKeyTransactions(
     )
     .flat();
 
-  console.log(`other key txns ${JSON.stringify(otherKeyTransactions)}`);
-
   for (let i = 0; i < otherKeyTransactions.length; i += INSERT_CHUNK_SIZE) {
     await knexTransaction<MobileSDKKeyTransaction>(
       "mobile_sdk_key_transactions"
@@ -438,8 +430,6 @@ function _getClientIdByWalletIdDict(
     clientIdByWalletId[walletId!] = decodedData.clientId;
   });
 
-  console.log(`clientIdByWalletId ${JSON.stringify(clientIdByWalletId)}`);
-
   return clientIdByWalletId;
 }
 
@@ -482,8 +472,6 @@ async function _createClientAppsFromReceipts(
   const clientDbIdsByClientId: { [key: string]: number } = Object.fromEntries(
     dbResponse.map((row) => [row.client_id, row.id!])
   );
-
-  console.log(`${JSON.stringify(clientDbIdsByClientId)} clientDbIdsByClientId`);
 
   // update client_app_id columns for wallets in clientIdByWalletId
   const caseIfClause = Object.entries(clientIdByWalletId)

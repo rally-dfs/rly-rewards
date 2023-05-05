@@ -1,4 +1,4 @@
-import { Transaction, TransactionReceipt } from "web3-core";
+import { TransactionReceipt } from "web3-core";
 import { BlockTransactionString } from "web3-eth";
 import Web3 from "web3";
 import { AbiItem } from "web3-utils";
@@ -11,51 +11,6 @@ const web3 = new Web3(
 
 export async function getBlockNumber() {
   return await web3.eth.getBlockNumber();
-}
-
-// TODO: just for testing/debugging, probably dont need this method
-async function _getTransactionsBatched(allTransactionHashes: string[]) {
-  const batch = new web3.BatchRequest();
-
-  const chunkSize = 17; // 17 CU * 17 calls = 289 CU (limit is ~330 CU/s)
-
-  let transactions: { [key: string]: Transaction } = {};
-
-  for (let i = 0; i < allTransactionHashes.length; i += chunkSize) {
-    const transactionHashesChunk = allTransactionHashes.slice(i, i + chunkSize);
-
-    const total = transactionHashesChunk.length;
-    let counter = 0;
-
-    await new Promise(function (resolve, reject) {
-      const callback = (error: Error, txn: Transaction) => {
-        if (error) {
-          return reject(error);
-        }
-
-        counter++;
-        transactions[txn.hash] = txn;
-
-        if (counter === total) {
-          resolve(transactions);
-        }
-      };
-
-      transactionHashesChunk.forEach((hash) => {
-        batch.add(
-          // 15 alchemy CU
-          (web3.eth.getTransaction as any).request(hash, callback)
-        );
-      });
-
-      batch.execute();
-    });
-
-    // rate limiting here so we only use ~300 CU/s
-    await new Promise((f) => setTimeout(f, TIMEOUT_BETWEEN_CALLS));
-  }
-
-  return transactions;
 }
 
 export async function getTransactionReceiptsBatched(
@@ -164,8 +119,6 @@ export async function getEventsTransactionReceiptsAndBlocksFromContracts(
 ) {
   const getEventsPromises = Object.entries(contractAddressToABI).map(
     ([contractAddress, contractABI]) => {
-      console.log(`address ${contractAddress}`);
-
       const contract = new web3.eth.Contract(contractABI, contractAddress);
 
       // TODO: need pagination/rate limiting here?
@@ -178,33 +131,23 @@ export async function getEventsTransactionReceiptsAndBlocksFromContracts(
 
   const allContractEvents = (await Promise.all(getEventsPromises)).flat();
 
-  // console.log(`events ${JSON.stringify(allContractEvents)}`);
-
   const transactionHashes = [
     ...new Set(allContractEvents.map((eventData) => eventData.transactionHash)),
   ];
 
-  const transactions = await _getTransactionsBatched(transactionHashes);
-
   const transactionReceipts = await getTransactionReceiptsBatched(
     transactionHashes
   );
-
-  // console.log(`receipts ${JSON.stringify(transactionReceipts)}`);
 
   const blockNumbers = [
     ...new Set(
       allContractEvents.map((eventData) => eventData.blockNumber).flat()
     ),
   ];
-
   const blocks = await _getBlocksForBlockNumbers(blockNumbers);
-
-  // console.log(`blocks ${JSON.stringify(blocks)}`);
 
   return {
     events: allContractEvents,
-    transactions,
     receipts: transactionReceipts,
     blocks,
   };

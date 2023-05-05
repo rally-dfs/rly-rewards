@@ -65,11 +65,7 @@ export async function getAllAssetTransfersByAddress(
             AssetTransfersCategory.SPECIALNFT,
           ],
         });
-      console.log(
-        `alchemy fromAssetTransfers ${JSON.stringify(
-          fromAssetTransfers
-        )} pagekey ${pageKey}`
-      );
+
       allWalletAssetTransfers = allWalletAssetTransfers.concat(
         fromAssetTransfers.transfers.map((transfer) => ({
           is_incoming: false, // is_incoming false for these instead of true like above
@@ -105,11 +101,6 @@ export async function getAllAssetTransfersByAddress(
             AssetTransfersCategory.SPECIALNFT,
           ],
         });
-      console.log(
-        `alchemy toAssetTransfers ${JSON.stringify(
-          toAssetTransfers
-        )} pagekey ${pageKey}`
-      );
 
       allWalletAssetTransfers = allWalletAssetTransfers.concat(
         toAssetTransfers.transfers.map((transfer) => ({

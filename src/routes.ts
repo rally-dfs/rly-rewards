@@ -76,7 +76,7 @@ routes.get("/mobile_sdk_metrics", async (_req, res) => {
     .from(
       knex
         .from("mobile_sdk_key_transactions")
-        .select(knex.raw("gas_amount * gas_price as gas_paid")) // TODO: probably need a nested query here
+        .select(knex.raw("gas_amount * gas_price as gas_paid"))
         .where("gas_paid_by_rna", true)
         .as("t1")
     )
