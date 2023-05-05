@@ -29,7 +29,7 @@ const main = async () => {
     return;
   }
 
-  await getMobileSDKTransactions(toBlock, fromBlock);
+  await getMobileSDKTransactions(fromBlock, toBlock);
 
   closeKnexConnection();
 };

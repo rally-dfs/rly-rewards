@@ -14,6 +14,7 @@ import RLYPaymasterABI from "./chain-data-utils/abis/paymaster.json";
 import TokenFaucetABI from "./chain-data-utils/abis/token_faucet.json";
 
 import {
+  getBlockNumber,
   getEventsTransactionReceiptsAndBlocksFromContracts,
   getTransactionReceiptsBatched,
 } from "./chain-data-utils/polygon";
@@ -36,9 +37,15 @@ const EVENT_TOPIC_RLY_PAYMASTER_PRE_CALL_VALUES =
 const EVENT_TOPIC_RLY_PAYMASTER_POST_CALL_VALUES =
   "0xade5d601b68375ded0f1639e57b7b3538b90c7f0e380e8e9152361f6e1289da5";
 
+/** Fetches all MobileSDKKeyTransactions, MobileSDKWallets, and MobileSDKClientApps
+ * for the block range starting at toBlock (inclusive) and ending at fromBlock (inclusive)
+ *
+ * @param fromBlock if undefined, fetches from the most recently fetched block
+ * @param toBlock if undefined, fetches to the most recent block on chain
+ */
 export async function getMobileSDKTransactions(
-  toBlock: number,
-  fromBlock?: number
+  fromBlock?: number,
+  toBlock?: number
 ) {
   const knex = getKnex();
 
@@ -48,8 +55,8 @@ export async function getMobileSDKTransactions(
       // other transactions get out of sync it can cause gaps for future fetches
       await _getMobileSDKTransactionsAtomic(
         knexTransaction,
-        toBlock,
-        fromBlock
+        fromBlock,
+        toBlock
       );
     })
     .then(() => {
@@ -70,12 +77,17 @@ export async function getMobileSDKTransactions(
 
 async function _getMobileSDKTransactionsAtomic(
   knexTransaction: Knex.Transaction,
-  toBlock: number,
-  fromBlock?: number
+  fromBlock?: number,
+  toBlock?: number
 ) {
   const contractsAndABIs = {
     [TOKEN_FAUCET_ADDRESS]: TokenFaucetABI as AbiItem[],
   };
+
+  if (toBlock === undefined) {
+    toBlock = await getBlockNumber();
+    console.log(`Using most recent block ${toBlock} as toBlock`);
+  }
 
   if (fromBlock === undefined) {
     const dbResponse = await knexTransaction<MobileSDKKeyTransaction>(

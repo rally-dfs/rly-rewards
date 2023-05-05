@@ -10,6 +10,10 @@ const web3Mumbai = new Web3(
   `https://polygon-mumbai.g.alchemy.com/v2/${process.env.ALCHEMY_ID}`
 );
 
+export async function getBlockNumber() {
+  return await web3Mumbai.eth.getBlockNumber();
+}
+
 // TODO: just for testing/debugging, probably dont need this method
 async function _getTransactionsBatched(allTransactionHashes: string[]) {
   const batch = new web3Mumbai.BatchRequest();
