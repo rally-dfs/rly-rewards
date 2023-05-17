@@ -27,7 +27,9 @@ export async function getAllAssetTransfersByAddress(
 }> {
   const config = {
     apiKey: process.env.ALCHEMY_ID,
-    network: Network.MATIC_MAINNET,
+    network: process.env.MOBILE_SDK_MUMBAI
+      ? Network.MATIC_MUMBAI
+      : Network.MATIC_MAINNET,
   };
   const alchemy = new Alchemy(config);
 

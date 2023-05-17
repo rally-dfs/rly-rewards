@@ -6,7 +6,9 @@ import { AbiItem } from "web3-utils";
 const TIMEOUT_BETWEEN_CALLS = 1000;
 
 const web3 = new Web3(
-  `https://polygon-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_ID}`
+  process.env.MOBILE_SDK_MUMBAI
+    ? `https://polygon-mumbai.g.alchemy.com/v2/${process.env.ALCHEMY_ID}`
+    : `https://polygon-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_ID}`
 );
 
 export async function getBlockNumber() {
