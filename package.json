@@ -24,6 +24,7 @@
     "node": "16.14.2"
   },
   "dependencies": {
+    "@aws-sdk/client-sns": "^3.329.0",
     "@solana/web3.js": "^1.73.0",
     "@types/cors": "^2.8.12",
     "@types/date-fns": "^2.6.0",

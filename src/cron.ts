@@ -3,6 +3,7 @@ import cron from "node-cron";
 import { getAllDailyTokenBalancesSinceLastFetch } from "./liquidity_pools";
 import { getAllTrackedTokenAccountInfoAndTransactionsForEndDate } from "./tracked_token_accounts";
 import { getMobileSDKTransactions } from "./mobile_sdk";
+import { checkAndTriggerMobileSDKAlerts } from "./chain-data-utils/monitoring";
 
 export function initCron() {
   cron.schedule("0 0 * * *", async () => {
@@ -39,5 +40,10 @@ export function initCron() {
     // fetching the mobile SDK metrics is pretty light weight and just depends on blocks
     // (not e.g. UTC midnight time stamps), so we can run it every hour
     await getMobileSDKTransactions(undefined, undefined);
+  });
+
+  cron.schedule("0 * * * *", async () => {
+    // check mobile sdk alerts every hour
+    await checkAndTriggerMobileSDKAlerts();
   });
 }

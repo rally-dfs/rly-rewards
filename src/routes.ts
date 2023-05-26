@@ -16,6 +16,7 @@ import {
   totalRLYRewardsDistributed,
 } from "./computed_metrics/rewards_distributed";
 import { getOffchainHardcodedData } from "./computed_metrics/offchain_hardcoded";
+import { checkAndTriggerMobileSDKAlerts } from "./chain-data-utils/monitoring";
 
 const routes = Router();
 
@@ -24,6 +25,15 @@ const knex = getKnex();
 routes.get("/", async (_req, res) => {
   return res.json({
     message: "RLY Rewards!",
+  });
+});
+
+routes.get("/test_sdk_alert_trigger", async (_req, res) => {
+  const success = await checkAndTriggerMobileSDKAlerts();
+
+  return res.json({
+    message: `Test trigger done`,
+    success,
   });
 });
 
