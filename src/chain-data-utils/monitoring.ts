@@ -25,21 +25,21 @@ export async function checkAndTriggerMobileSDKAlerts() {
   try {
     await triggerPaymasterAlerts();
   } catch (error) {
-    sendSNSAlert(`Error triggering paymaster alerts ${error}`);
+    sendSNSAlert(`Error triggering paymaster alerts`, `Error: ${error}`);
     allSuccess = false;
   }
 
   try {
     await triggerRNAPaidAlerts();
   } catch (error) {
-    sendSNSAlert(`Error triggering gas alerts ${error}`);
+    sendSNSAlert(`Error triggering gas alerts`, `Error: ${error}`);
     allSuccess = false;
   }
 
   try {
     await triggerRelayAlerts();
   } catch (error) {
-    sendSNSAlert(`Error triggering relay alerts ${error}`);
+    sendSNSAlert(`Error triggering relay alerts`, `Error: ${error}`);
     allSuccess = false;
   }
 
@@ -48,7 +48,7 @@ export async function checkAndTriggerMobileSDKAlerts() {
   return allSuccess;
 }
 
-async function sendSNSAlert(subject: string, body?: string) {
+async function sendSNSAlert(subject: string, body: string) {
   console.log(`Sending SNS alert ${subject} ${body}`);
 
   const client = new SNSClient({ region: "us-west-1" });
@@ -84,15 +84,20 @@ async function triggerRelayAlerts() {
     );
   }
 
-  const mumbaiFetch = await fetch(
-    `https://gsn-relay-polygon-mumbai.rly.network/getaddr`
-  );
-  const mumbaiStatus = await mumbaiFetch.json();
-  if (!mumbaiStatus.ready) {
-    sendSNSAlert(
-      `Mumbai relay manager is not ready`,
-      `Got mumbai relay status: ${JSON.stringify(mumbaiStatus)}`
+  try {
+    const mumbaiFetch = await fetch(
+      `https://gsn-relay-polygon-mumbai.rly.network/getaddr`,
+      { timeout: 5000 }
     );
+    const mumbaiStatus = await mumbaiFetch.json();
+    if (!mumbaiStatus.ready) {
+      sendSNSAlert(
+        `Mumbai relay manager is not ready`,
+        `Got mumbai relay status: ${JSON.stringify(mumbaiStatus)}`
+      );
+    }
+  } catch (error) {
+    sendSNSAlert(`Mumbai relay manager response error`, `Error: ${error}`);
   }
 
   const mainnetManagerBalance = parseInt(
@@ -107,15 +112,20 @@ async function triggerRelayAlerts() {
     );
   }
 
-  const mainnetFetch = await fetch(
-    `https://gsn-relay-polygon.rly.network/getaddr`
-  );
-  const mainnetStatus = await mainnetFetch.json();
-  if (!mainnetStatus.ready) {
-    sendSNSAlert(
-      `Mainnet relay manager is not ready`,
-      `Got mainnet relay status: ${JSON.stringify(mainnetStatus)}`
+  try {
+    const mainnetFetch = await fetch(
+      `https://gsn-relay-polygon.rly.network/getaddr`,
+      { timeout: 5000 }
     );
+    const mainnetStatus = await mainnetFetch.json();
+    if (!mainnetStatus.ready) {
+      sendSNSAlert(
+        `Mainnet relay manager is not ready`,
+        `Got mainnet relay status: ${JSON.stringify(mainnetStatus)}`
+      );
+    }
+  } catch (error) {
+    sendSNSAlert(`Mainnet relay manager response error`, `Error: ${error}`);
   }
 }
 
