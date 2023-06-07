@@ -80,7 +80,9 @@ async function triggerRelayAlerts() {
   if (mumbaiManagerBalance < 0.5 * 10 ** 18) {
     sendSNSAlert(
       `Mumbai relay manager balance too low`,
-      `Got mumbai relay manager balance ${mumbaiManagerBalance / 10 ** 18}`
+      `Got mumbai relay manager balance ${
+        mumbaiManagerBalance / 10 ** 18
+      }. Relay manager address: 0x3889a1fA05862DEb184c800997Aa441Cd5648b42`
     );
   }
 
@@ -93,11 +95,16 @@ async function triggerRelayAlerts() {
     if (!mumbaiStatus.ready) {
       sendSNSAlert(
         `Mumbai relay manager is not ready`,
-        `Got mumbai relay status: ${JSON.stringify(mumbaiStatus)}`
+        `Got mumbai relay status: ${JSON.stringify(
+          mumbaiStatus
+        )}. https://gsn-relay-polygon-mumbai.rly.network/getaddr`
       );
     }
   } catch (error) {
-    sendSNSAlert(`Mumbai relay manager response error`, `Error: ${error}`);
+    sendSNSAlert(
+      `Mumbai relay manager response error`,
+      `https://gsn-relay-polygon-mumbai.rly.network/getaddr Error: ${error}`
+    );
   }
 
   const mainnetManagerBalance = parseInt(
@@ -108,7 +115,9 @@ async function triggerRelayAlerts() {
   if (mainnetManagerBalance < 0.5 * 10 ** 18) {
     sendSNSAlert(
       `Mainnet relay manager balance too low`,
-      `Got mainnet relay manager balance ${mainnetManagerBalance / 10 ** 18}`
+      `Got mainnet relay manager balance ${
+        mainnetManagerBalance / 10 ** 18
+      }. Relay manager address: 0x97cdbea30f494eddf513eec27c9b3bd5aff8d9d9`
     );
   }
 
@@ -121,11 +130,16 @@ async function triggerRelayAlerts() {
     if (!mainnetStatus.ready) {
       sendSNSAlert(
         `Mainnet relay manager is not ready`,
-        `Got mainnet relay status: ${JSON.stringify(mainnetStatus)}`
+        `Got mainnet relay status: ${JSON.stringify(
+          mainnetStatus
+        )}. https://gsn-relay-polygon.rly.network/getaddr`
       );
     }
   } catch (error) {
-    sendSNSAlert(`Mainnet relay manager response error`, `Error: ${error}`);
+    sendSNSAlert(
+      `Mainnet relay manager response error`,
+      `https://gsn-relay-polygon.rly.network/getaddr Error: ${error}`
+    );
   }
 }
 
