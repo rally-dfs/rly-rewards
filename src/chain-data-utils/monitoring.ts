@@ -130,31 +130,69 @@ async function triggerRelayAlerts() {
 }
 
 async function triggerPaymasterAlerts() {
-  const mumbaiPaymasterBalance = await getPaymasterBalance(
-    web3Mumbai,
-    "0x3232f21A6E08312654270c78A773f00dd61d60f5",
-    "0x298b3CA442474e2cf73874171986F90F0ACF07e2",
-    await web3Mumbai.eth.getBlockNumber()
-  );
-  if (mumbaiPaymasterBalance < 5 * 10 ** 18) {
-    sendSNSAlert(
-      `Mumbai paymaster balance too low`,
-      `Got mumbai paymaster balance ${mumbaiPaymasterBalance / 10 ** 18}`
-    );
-  }
+  const paymasterArgs = [
+    {
+      name: "Mumbai 3.0.0-beta.2",
+      relayHub: "0x3232f21A6E08312654270c78A773f00dd61d60f5",
+      paymaster: "0x298b3CA442474e2cf73874171986F90F0ACF07e2",
+      web3: web3Mumbai,
+    },
+    {
+      name: "Mumbai 3.0.0-beta.3",
+      relayHub: "0x3232f21A6E08312654270c78A773f00dd61d60f5",
+      paymaster: "0x499D418D4493BbE0D9A8AF3D2A0768191fE69B87",
+      web3: web3Mumbai,
+    },
+    {
+      name: "Mainnet 3.0.0-beta.2",
+      relayHub: "0xfCEE9036EDc85cD5c12A9De6b267c4672Eb4bA1B",
+      paymaster: "0x8053437610491a877a1078BA7b1deD7D353f14cf",
+      web3: web3Mainnet,
+    },
+    {
+      name: "Mainnet 3.0.0-beta.3",
+      relayHub: "0xfCEE9036EDc85cD5c12A9De6b267c4672Eb4bA1B",
+      paymaster: "0x61B9BdF9c10F77bD9eD033559Cec410427aeb8A2",
+      web3: web3Mainnet,
+    },
+  ];
 
-  const mainnetPaymasterBalance = await getPaymasterBalance(
-    web3Mainnet,
-    "0xfCEE9036EDc85cD5c12A9De6b267c4672Eb4bA1B",
-    "0x8053437610491a877a1078BA7b1deD7D353f14cf",
-    await web3Mainnet.eth.getBlockNumber()
+  const balances = await Promise.allSettled(
+    paymasterArgs.map(async (args) =>
+      getPaymasterBalance(
+        args.web3,
+        args.relayHub,
+        args.paymaster,
+        await args.web3.eth.getBlockNumber()
+      )
+    )
   );
-  if (mainnetPaymasterBalance < 5 * 10 ** 18) {
-    sendSNSAlert(
-      `Mainnet paymaster balance too low`,
-      `Got mainnet paymaster balance ${mainnetPaymasterBalance / 10 ** 18}`
-    );
-  }
+
+  balances.forEach((result, index) => {
+    if (result.status === "rejected") {
+      sendSNSAlert(
+        `Error fetching ${paymasterArgs[index]!.name} balance`,
+        `Can double check manually - go to contract methods at relayHub address ${
+          paymasterArgs[index]!.relayHub
+        } and call balanceOf using paymaster address ${
+          paymasterArgs[index]!.paymaster
+        }`
+      );
+      return;
+    }
+    if (result.value < 5 * 10 ** 18) {
+      sendSNSAlert(
+        `${paymasterArgs[index]!.name} paymaster balance too low`,
+        `Got ${paymasterArgs[index]!.name} paymaster balance ${
+          result.value / 10 ** 18
+        }. Check relayHub address ${
+          paymasterArgs[index]!.relayHub
+        } and call balanceOf using paymaster address ${
+          paymasterArgs[index]!.paymaster
+        }`
+      );
+    }
+  });
 }
 
 async function getPaymasterBalance(
