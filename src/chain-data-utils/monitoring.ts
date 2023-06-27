@@ -77,12 +77,26 @@ async function triggerRelayAlerts() {
       "0x3889a1fA05862DEb184c800997Aa441Cd5648b42"
     )
   );
-  if (mumbaiManagerBalance < 0.5 * 10 ** 18) {
+  if (mumbaiManagerBalance < 2 * 10 ** 18) {
     sendSNSAlert(
       `Mumbai relay manager balance too low`,
       `Got mumbai relay manager balance ${
         mumbaiManagerBalance / 10 ** 18
       }. Relay manager address: 0x3889a1fA05862DEb184c800997Aa441Cd5648b42`
+    );
+  }
+
+  const mumbaiWorkerBalance = parseInt(
+    await web3Mumbai.eth.getBalance(
+      "0xb9950b71ec94cbb274aeb1be98e697678077a17f"
+    )
+  );
+  if (mumbaiWorkerBalance < 0.3 * 10 ** 18) {
+    sendSNSAlert(
+      `Mumbai relay worker balance too low`,
+      `Got mumbai relay worker balance ${
+        mumbaiWorkerBalance / 10 ** 18
+      }. Relay worker address: 0xb9950b71ec94cbb274aeb1be98e697678077a17f`
     );
   }
 
@@ -112,12 +126,26 @@ async function triggerRelayAlerts() {
       "0x97cdbea30f494eddf513eec27c9b3bd5aff8d9d9"
     )
   );
-  if (mainnetManagerBalance < 0.5 * 10 ** 18) {
+  if (mainnetManagerBalance < 2 * 10 ** 18) {
     sendSNSAlert(
       `Mainnet relay manager balance too low`,
       `Got mainnet relay manager balance ${
         mainnetManagerBalance / 10 ** 18
       }. Relay manager address: 0x97cdbea30f494eddf513eec27c9b3bd5aff8d9d9`
+    );
+  }
+
+  const mainnetWorkerBalance = parseInt(
+    await web3Mainnet.eth.getBalance(
+      "0x579de7c56cd9a07330504a7c734023a9f703778a"
+    )
+  );
+  if (mainnetWorkerBalance < 0.3 * 10 ** 18) {
+    sendSNSAlert(
+      `Mainnet relay worker balance too low`,
+      `Got mainnet relay worker balance ${
+        mainnetWorkerBalance / 10 ** 18
+      }. Relay worker address: 0x579de7c56cd9a07330504a7c734023a9f703778a`
     );
   }
 
