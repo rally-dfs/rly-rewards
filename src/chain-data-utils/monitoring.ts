@@ -178,24 +178,42 @@ async function triggerPaymasterAlerts() {
       relayHub: "0x3232f21A6E08312654270c78A773f00dd61d60f5",
       paymaster: "0x298b3CA442474e2cf73874171986F90F0ACF07e2",
       web3: web3Mumbai,
+      threshold: 0, // deprecated, can run out
     },
     {
       name: "Mumbai 3.0.0-beta.3",
       relayHub: "0x3232f21A6E08312654270c78A773f00dd61d60f5",
       paymaster: "0x499D418D4493BbE0D9A8AF3D2A0768191fE69B87",
       web3: web3Mumbai,
+      threshold: 0, // deprecated, can run out
+    },
+    {
+      name: "Mumbai 3.0.0-beta.3 sassy extra signature",
+      relayHub: "0x3232f21A6E08312654270c78A773f00dd61d60f5",
+      paymaster: "0x8b3a505413Ca3B0A17F077e507aF8E3b3ad4Ce4d",
+      web3: web3Mumbai,
+      threshold: 20 * 10 ** 18,
     },
     {
       name: "Mainnet 3.0.0-beta.2",
       relayHub: "0xfCEE9036EDc85cD5c12A9De6b267c4672Eb4bA1B",
       paymaster: "0x8053437610491a877a1078BA7b1deD7D353f14cf",
       web3: web3Mainnet,
+      threshold: 20 * 10 ** 18,
     },
     {
       name: "Mainnet 3.0.0-beta.3",
       relayHub: "0xfCEE9036EDc85cD5c12A9De6b267c4672Eb4bA1B",
       paymaster: "0x61B9BdF9c10F77bD9eD033559Cec410427aeb8A2",
       web3: web3Mainnet,
+      threshold: 20 * 10 ** 18,
+    },
+    {
+      name: "Mainnet 3.0.0-beta.3 sassy extra signature",
+      relayHub: "0xfCEE9036EDc85cD5c12A9De6b267c4672Eb4bA1B",
+      paymaster: "0x29CAa31142D17545C310437825aA4C53FbE621C3",
+      web3: web3Mainnet,
+      threshold: 20 * 10 ** 18,
     },
   ];
 
@@ -222,7 +240,7 @@ async function triggerPaymasterAlerts() {
       );
       return;
     }
-    if (result.value < 5 * 10 ** 18) {
+    if (result.value < paymasterArgs[index]!.threshold) {
       sendSNSAlert(
         `${paymasterArgs[index]!.name} paymaster balance too low`,
         `Got ${paymasterArgs[index]!.name} paymaster balance ${
