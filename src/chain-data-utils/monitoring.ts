@@ -140,7 +140,7 @@ async function triggerRelayAlerts() {
       "0x579de7c56cd9a07330504a7c734023a9f703778a"
     )
   );
-  if (mainnetWorkerBalance < 0.3 * 10 ** 18) {
+  if (mainnetWorkerBalance < 10 * 10 ** 18) {
     sendSNSAlert(
       `Mainnet relay worker balance too low`,
       `Got mainnet relay worker balance ${
